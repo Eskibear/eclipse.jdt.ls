@@ -33,12 +33,18 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 public class CompletionHandler{
 
+	private PreferenceManager manager;
+
+	public CompletionHandler(PreferenceManager manager) {
+		this.manager = manager;
+	}
+
 	Either<List<CompletionItem>, CompletionList> completion(CompletionParams position,
 			IProgressMonitor monitor) {
-		List<CompletionItem> completionItems = null;
+		CompletionList $ = null;
 		try {
 			ICompilationUnit unit = JDTUtils.resolveCompilationUnit(position.getTextDocument().getUri());
-			completionItems = this.computeContentAssist(unit,
+			$ = this.computeContentAssist(unit,
 					position.getPosition().getLine(),
 					position.getPosition().getCharacter(), monitor);
 		} catch (OperationCanceledException ignorable) {
@@ -48,27 +54,31 @@ public class CompletionHandler{
 			JavaLanguageServerPlugin.logException("Problem with codeComplete for " +  position.getTextDocument().getUri(), e);
 			monitor.setCanceled(true);
 		}
-		CompletionList $ = new CompletionList();
+		if ($ == null) {
+			$ = new CompletionList();
+		}
+		if ($.getItems() == null) {
+			$.setItems(Collections.emptyList());
+		}
 		if (monitor.isCanceled()) {
 			$.setIsIncomplete(true);
-			completionItems = null;
+			//completionItems = null;
 			JavaLanguageServerPlugin.logInfo("Completion request cancelled");
 		} else {
 			JavaLanguageServerPlugin.logInfo("Completion request completed");
 		}
-		$.setItems(completionItems == null ? Collections.emptyList() : completionItems);
 		return Either.forRight($);
 	}
 
-	private List<CompletionItem> computeContentAssist(ICompilationUnit unit, int line, int column, IProgressMonitor monitor) throws JavaModelException {
+	private CompletionList computeContentAssist(ICompilationUnit unit, int line, int column, IProgressMonitor monitor) throws JavaModelException {
 		CompletionResponses.clear();
 		if (unit == null) {
-			return Collections.emptyList();
+			return null;
 		}
 		List<CompletionItem> proposals = new ArrayList<>();
 
 		final int offset = JsonRpcHelpers.toOffset(unit.getBuffer(), line, column);
-		CompletionProposalRequestor collector = new CompletionProposalRequestor(unit, offset);
+		CompletionProposalRequestor collector = new CompletionProposalRequestor(unit, offset, manager);
 		// Allow completions for unresolved types - since 3.3
 		collector.setAllowsRequiredProposals(CompletionProposal.FIELD_REF, CompletionProposal.TYPE_REF, true);
 		collector.setAllowsRequiredProposals(CompletionProposal.FIELD_REF, CompletionProposal.TYPE_IMPORT, true);
@@ -84,7 +94,6 @@ public class CompletionHandler{
 		collector.setAllowsRequiredProposals(CompletionProposal.ANONYMOUS_CLASS_DECLARATION, CompletionProposal.TYPE_REF, true);
 
 		collector.setAllowsRequiredProposals(CompletionProposal.TYPE_REF, CompletionProposal.TYPE_REF, true);
-
 		collector.setFavoriteReferences(getFavoriteStaticMembers());
 
 		if (offset >-1 && !monitor.isCanceled()) {
@@ -114,7 +123,9 @@ public class CompletionHandler{
 				}
 			}
 		}
-		return proposals;
+		CompletionList list = new CompletionList(proposals);
+		list.setIsIncomplete(!collector.isComplete());
+		return list;
 	}
 
 	private String[] getFavoriteStaticMembers() {

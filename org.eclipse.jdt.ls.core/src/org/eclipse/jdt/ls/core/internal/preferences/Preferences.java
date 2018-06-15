@@ -11,6 +11,7 @@
 package org.eclipse.jdt.ls.core.internal.preferences;
 
 import static org.eclipse.jdt.ls.core.internal.handlers.MapFlattener.getBoolean;
+import static org.eclipse.jdt.ls.core.internal.handlers.MapFlattener.getInt;
 import static org.eclipse.jdt.ls.core.internal.handlers.MapFlattener.getList;
 import static org.eclipse.jdt.ls.core.internal.handlers.MapFlattener.getString;
 
@@ -136,6 +137,13 @@ public class Preferences {
 	public static final List<String> JAVA_COMPLETION_FAVORITE_MEMBERS_DEFAULT;
 
 	/**
+	 * Preference key for maximum number of completion results to be returned.
+	 * Defaults to 30.
+	 */
+	public static final String JAVA_COMPLETION_MAX_RESULTS_KEY = "java.completion.maxResults";
+	public static final int JAVA_COMPLETION_MAX_RESULTS_DEFAULT = 30;
+
+	/**
 	 * A named preference that controls if the Java code assist only inserts
 	 * completions. When set to true, code completion overwrites the current text.
 	 * When set to false, code is simply added instead.
@@ -244,6 +252,7 @@ public class Preferences {
 	private String formatterUrl;
 	private String formatterProfileName;
 	private Collection<IPath> rootPaths;
+	private int maxCompletionResults;
 
 	static {
 		JAVA_IMPORT_EXCLUSIONS_DEFAULT = new ArrayList<>();
@@ -332,6 +341,7 @@ public class Preferences {
 		formatterUrl = null;
 		formatterProfileName = null;
 		importOrder = JAVA_IMPORT_ORDER_DEFAULT;
+		maxCompletionResults = JAVA_COMPLETION_MAX_RESULTS_DEFAULT;
 	}
 
 	/**
@@ -413,6 +423,9 @@ public class Preferences {
 
 		List<String> javaImportOrder = getList(configuration, JAVA_IMPORT_ORDER_KEY, JAVA_IMPORT_ORDER_DEFAULT);
 		prefs.setImportOrder(javaImportOrder);
+
+		int maxCompletions = getInt(configuration, JAVA_COMPLETION_MAX_RESULTS_KEY, JAVA_COMPLETION_MAX_RESULTS_DEFAULT);
+		prefs.setMaxCompletionResults(maxCompletions);
 		return prefs;
 	}
 
@@ -649,7 +662,17 @@ public class Preferences {
 		return javaFormatOnTypeEnabled;
 	}
 
-	public void setJavaFormatOnTypeEnabled(boolean javaFormatOnTypeEnabled) {
+	public Preferences setJavaFormatOnTypeEnabled(boolean javaFormatOnTypeEnabled) {
 		this.javaFormatOnTypeEnabled = javaFormatOnTypeEnabled;
+		return this;
+	}
+
+	public int getMaxCompletionResults() {
+		return maxCompletionResults;
+	}
+
+	public Preferences setMaxCompletionResults(int maxCompletions) {
+		this.maxCompletionResults = maxCompletions;
+		return this;
 	}
 }
