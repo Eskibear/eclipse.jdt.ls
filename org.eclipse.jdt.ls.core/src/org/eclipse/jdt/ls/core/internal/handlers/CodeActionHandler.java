@@ -181,20 +181,30 @@ public class CodeActionHandler {
 		return $;
 	}
 
+	public static WorkspaceEdit convertChangeToWorkspaceEdit(ICompilationUnit unit, Change[] changes) throws CoreException {
+		WorkspaceEdit $ = new WorkspaceEdit();
+		for (Change change : changes) {
+			addChangeToWorkspaceEdit(unit, change, $);
+		}
+		return $;
+	}
+
 	public static WorkspaceEdit convertChangeToWorkspaceEdit(ICompilationUnit unit, Change change) throws CoreException {
 		WorkspaceEdit $ = new WorkspaceEdit();
+		addChangeToWorkspaceEdit(unit, change, $);
+		return $;
+	}
 
+	private static void addChangeToWorkspaceEdit(ICompilationUnit unit, Change change, WorkspaceEdit edit) throws CoreException {
 		if (change instanceof TextChange) {
 			TextEditConverter converter = new TextEditConverter(unit, ((TextChange) change).getEdit());
 			String uri = JDTUtils.toURI(unit);
-			$.getChanges().put(uri, converter.convert());
+			edit.getChanges().put(uri, converter.convert());
 		} else if (change instanceof ResourceChange) {
-			ChangeUtil.convertResourceChange((ResourceChange) change, $);
+			ChangeUtil.convertResourceChange((ResourceChange) change, edit);
 		} else if (change instanceof CompositeChange) {
-			ChangeUtil.convertCompositeChange(change, $);
+			ChangeUtil.convertCompositeChange(change, edit);
 		}
-
-		return $;
 	}
 
 	public static CompilationUnit getASTRoot(ICompilationUnit unit) {

@@ -38,6 +38,7 @@ import org.eclipse.jdt.internal.corext.util.JavaModelUtil;
 import org.eclipse.jdt.ls.core.internal.corext.refactoring.changes.DynamicValidationRefactoringChange;
 import org.eclipse.jdt.ls.core.internal.corext.refactoring.changes.RenameCompilationUnitChange;
 import org.eclipse.jdt.ls.core.internal.corext.refactoring.changes.RenamePackageChange;
+import org.eclipse.jdt.ls.core.internal.corext.refactoring.nls.changes.CreateFileChange;
 import org.eclipse.jdt.ls.core.internal.corext.util.JavaElementUtil;
 import org.eclipse.lsp4j.CreateFile;
 import org.eclipse.lsp4j.CreateFileOptions;
@@ -54,6 +55,7 @@ import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
 import org.eclipse.ltk.core.refactoring.TextChange;
 import org.eclipse.ltk.core.refactoring.resource.ResourceChange;
+import org.eclipse.text.edits.MultiTextEdit;
 import org.eclipse.text.edits.TextEdit;
 
 /**
@@ -66,6 +68,12 @@ public class ChangeUtil {
 
 	private static final String TEMP_FILE_NAME = ".temp";
 	private static final Range ZERO_RANGE = new Range(new Position(), new Position());
+
+	public static void convertTextChange(ICompilationUnit unit, Change change, WorkspaceEdit edit) {
+		TextEditConverter converter = new TextEditConverter(unit, ((TextChange) change).getEdit());
+		String uri = JDTUtils.toURI(unit);
+		edit.getChanges().put(uri, converter.convert());
+	}
 
 	/**
 	 * Converts changes to resource operations if resource operations are supported
@@ -122,14 +130,16 @@ public class ChangeUtil {
 			convertCUResourceChange(edit, (RenameCompilationUnitChange) resourceChange);
 		} else if (resourceChange instanceof RenamePackageChange) {
 			convertRenamePackcageChange(edit, (RenamePackageChange) resourceChange);
+		} else if (resourceChange instanceof CreateFileChange) {
+			convertCreateFileChange(edit, (CreateFileChange) resourceChange);
 		}
 	}
 
 	private static void doConvertCompositeChange(Change change, WorkspaceEdit edit) throws CoreException {
 		Object modifiedElement = change.getModifiedElement();
-		if (!(modifiedElement instanceof IJavaElement)) {
-			return;
-		}
+		//		if (!(modifiedElement instanceof IJavaElement)) {
+		//			return;
+		//		}
 
 		if (change instanceof TextChange) {
 			convertTextChange(edit, (IJavaElement) modifiedElement, (TextChange) change);
@@ -203,6 +213,13 @@ public class ChangeUtil {
 		edit.getDocumentChanges().add(Either.forRight(rf));
 	}
 
+	private static void convertCreateFileChange(WorkspaceEdit edit, CreateFileChange createFileChange) {
+		CreateFile createFile = new CreateFile();
+		createFile.setUri(ResourceUtils.fixURI(createFileChange.getPath().toFile().toURI()));
+		createFile.setOptions(new CreateFileOptions(false, true));
+		edit.getDocumentChanges().add(Either.forRight(createFile));
+	}
+
 	private static void convertTextChange(WorkspaceEdit root, IJavaElement element, TextChange textChange) {
 		TextEdit textEdits = textChange.getEdit();
 		if (textEdits == null) {
@@ -213,10 +230,13 @@ public class ChangeUtil {
 	}
 
 	private static void convertTextEdit(WorkspaceEdit root, ICompilationUnit unit, TextEdit textEdits) {
-		TextEdit[] children = textEdits.getChildren();
-		if (children.length == 0) {
-			return;
+		TextEdit[] children;
+		if (textEdits instanceof MultiTextEdit) {
+			children = textEdits.getChildren();
+		} else {
+			children = new TextEdit[] { textEdits };
 		}
+
 		for (TextEdit textEdit : children) {
 			TextEditConverter converter = new TextEditConverter(unit, textEdit);
 			String uri = JDTUtils.toURI(unit);
