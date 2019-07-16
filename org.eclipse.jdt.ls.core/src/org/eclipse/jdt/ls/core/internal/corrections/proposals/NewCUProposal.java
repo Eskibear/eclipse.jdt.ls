@@ -10,39 +10,23 @@
  *******************************************************************************/
 package org.eclipse.jdt.ls.core.internal.corrections.proposals;
 
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
-import java.util.function.Predicate;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.Status;
 import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
-import org.eclipse.jdt.core.IPackageDeclaration;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.JavaCore;
-import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
-import org.eclipse.jdt.core.dom.CatchClause;
 import org.eclipse.jdt.core.dom.CompilationUnit;
-import org.eclipse.jdt.core.dom.IBinding;
-import org.eclipse.jdt.core.dom.ITypeBinding;
-import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.ParameterizedType;
-import org.eclipse.jdt.core.dom.ProvidesDirective;
 import org.eclipse.jdt.core.manipulation.CodeGeneration;
-import org.eclipse.jdt.internal.core.manipulation.CodeTemplateContext;
-import org.eclipse.jdt.internal.core.manipulation.CodeTemplateContextType;
 import org.eclipse.jdt.internal.core.manipulation.StubUtility;
-import org.eclipse.jdt.internal.core.manipulation.dom.ASTResolving;
 import org.eclipse.jdt.internal.core.manipulation.util.BasicElementLabels;
-import org.eclipse.jdt.internal.core.manipulation.util.Strings;
 import org.eclipse.jdt.internal.corext.dom.ASTNodes;
 import org.eclipse.jdt.internal.corext.dom.IASTSharedValues;
 import org.eclipse.jdt.internal.corext.util.JavaModelUtil;
@@ -50,11 +34,6 @@ import org.eclipse.jdt.internal.corext.util.Messages;
 import org.eclipse.jdt.ls.core.internal.corext.refactoring.nls.changes.CreateTextFileChange;
 import org.eclipse.jdt.ls.core.internal.corrections.CorrectionMessages;
 import org.eclipse.jdt.ls.core.internal.corrections.IInvocationContext;
-import org.eclipse.jdt.ls.core.internal.preferences.CodeGenerationTemplate;
-import org.eclipse.jface.text.BadLocationException;
-import org.eclipse.jface.text.templates.Template;
-import org.eclipse.jface.text.templates.TemplateBuffer;
-import org.eclipse.jface.text.templates.TemplateException;
 import org.eclipse.lsp4j.CodeActionKind;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
@@ -264,7 +243,7 @@ public class NewCUProposal extends ChangeCorrectionProposal {
 	}
 
 	// TODO: enable fileComment, typeComment
-	private static String constructCUContent(ICompilationUnit cu, String typeContent, String lineDelimiter) throws CoreException {
+	private String constructCUContent(ICompilationUnit cu, String typeContent, String lineDelimiter) throws CoreException {
 		//		String fileComment= getFileComment(cu, lineDelimiter);
 		//		String typeComment= getTypeComment(cu, lineDelimiter);
 		IPackageFragment pack = (IPackageFragment) cu.getParent();
@@ -353,101 +332,6 @@ public class NewCUProposal extends ChangeCorrectionProposal {
 
 	private static String getCompilationUnitName(String typeName) {
 		return typeName + JavaModelUtil.DEFAULT_CU_SUFFIX;
-	}
-
-	private ITypeBinding getPossibleSuperTypeBinding(ASTNode node) {
-		if (node == null) {
-			return null;
-		}
-
-		if (fTypeKind == K_ANNOTATION) {
-			return null;
-		}
-
-		AST ast = node.getAST();
-		node = ASTNodes.getNormalizedNode(node);
-		ASTNode parent = node.getParent();
-		switch (parent.getNodeType()) {
-			case ASTNode.METHOD_DECLARATION:
-				if (node.getLocationInParent() == MethodDeclaration.THROWN_EXCEPTION_TYPES_PROPERTY) {
-					return ast.resolveWellKnownType("java.lang.Exception"); //$NON-NLS-1$
-				}
-				break;
-			case ASTNode.THROW_STATEMENT:
-				return ast.resolveWellKnownType("java.lang.Exception"); //$NON-NLS-1$
-			case ASTNode.SINGLE_VARIABLE_DECLARATION:
-				if (parent.getLocationInParent() == CatchClause.EXCEPTION_PROPERTY) {
-					return ast.resolveWellKnownType("java.lang.Exception"); //$NON-NLS-1$
-				}
-				break;
-			case ASTNode.VARIABLE_DECLARATION_STATEMENT:
-			case ASTNode.FIELD_DECLARATION:
-				return null; // no guessing for LHS types, cannot be a supertype of a known type
-			case ASTNode.PARAMETERIZED_TYPE:
-				return null; // Inheritance doesn't help: A<X> z= new A<String>(); ->
-			case ASTNode.PROVIDES_DIRECTIVE:
-				if (node.getLocationInParent() == ProvidesDirective.IMPLEMENTATIONS_PROPERTY) {
-					Name serviceName = ((ProvidesDirective) parent).getName();
-					IBinding binding = serviceName.resolveBinding();
-					if (binding instanceof ITypeBinding) {
-						return (ITypeBinding) binding;
-					}
-				}
-				break;
-		}
-		ITypeBinding binding = ASTResolving.guessBindingForTypeReference(node);
-		if (binding != null && !binding.isRecovered()) {
-			return binding;
-		}
-		return null;
-	}
-
-	private static String getSnippetContent(ICompilationUnit cu, CodeGenerationTemplate templateSetting, String lineDelimiter, boolean snippetStringSupport) throws CoreException {
-		Template template = templateSetting.createTemplate(cu.getJavaProject());
-		if (template == null) {
-			return null;
-		}
-		CodeTemplateContext context = new CodeTemplateContext(template.getContextTypeId(), cu.getJavaProject(), lineDelimiter);
-
-		IPackageDeclaration[] packageDeclarations = cu.getPackageDeclarations();
-		String packageName = cu.getParent().getElementName();
-		String packageHeader = ((packageName != null && !packageName.isEmpty()) && (packageDeclarations == null || packageDeclarations.length == 0)) ? "package " + packageName + ";\n\n" : "";
-		context.setVariable(PACKAGEHEADER, packageHeader);
-		String typeName = JavaCore.removeJavaLikeExtension(cu.getElementName());
-		List<IType> types = Arrays.asList(cu.getAllTypes());
-		int postfix = 0;
-		while (types != null && !types.isEmpty() && types.stream().filter(isTypeExists(typeName)).findFirst().isPresent()) {
-			typeName = "Inner" + JavaCore.removeJavaLikeExtension(cu.getElementName()) + (postfix == 0 ? "" : "_" + postfix);
-			postfix++;
-		}
-		if (postfix > 0 && snippetStringSupport) {
-			context.setVariable(CodeTemplateContextType.TYPENAME, "${1:" + typeName + "}");
-		} else {
-			context.setVariable(CodeTemplateContextType.TYPENAME, typeName);
-		}
-		context.setVariable(CURSOR, snippetStringSupport ? "${0}" : "");
-
-		// TODO Consider making evaluateTemplate public in StubUtility
-		TemplateBuffer buffer;
-		try {
-			buffer = context.evaluate(template);
-		} catch (BadLocationException e) {
-			throw new CoreException(Status.CANCEL_STATUS);
-		} catch (TemplateException e) {
-			throw new CoreException(Status.CANCEL_STATUS);
-		}
-		if (buffer == null) {
-			return null;
-		}
-		String str = buffer.getString();
-		if (Strings.containsOnlyWhitespaces(str)) {
-			return null;
-		}
-		return str;
-	}
-
-	private static Predicate<IType> isTypeExists(String typeName) {
-		return type -> type.getElementName().equals(typeName);
 	}
 
 	public IType getCreatedType() {
