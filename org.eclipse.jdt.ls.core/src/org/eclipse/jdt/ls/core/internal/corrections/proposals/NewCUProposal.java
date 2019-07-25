@@ -19,13 +19,18 @@ import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.AbstractTypeDeclaration;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.ParameterizedType;
+import org.eclipse.jdt.core.dom.QualifiedName;
+import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.TypeParameter;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.jdt.core.manipulation.CodeGeneration;
@@ -38,7 +43,6 @@ import org.eclipse.jdt.internal.corext.util.JavaModelUtil;
 import org.eclipse.jdt.internal.corext.util.Messages;
 import org.eclipse.jdt.ls.core.internal.corext.refactoring.nls.changes.CreateFileChange;
 import org.eclipse.jdt.ls.core.internal.corrections.CorrectionMessages;
-import org.eclipse.jdt.ls.core.internal.corrections.IInvocationContext;
 import org.eclipse.lsp4j.CodeActionKind;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
@@ -49,12 +53,10 @@ import org.eclipse.text.edits.TextEdit;
  * This proposal is listed in the corrections list for a "type not found"
  * problem. It offers to create a new type.
  *
- * @see UnresolvedElementsSubProcessor#getTypeProposals(IInvocationContext,
- *      IProblemLocation, Collection)
+ * @see UnresolvedElementsSubProcessor#addNewTypeProposals(ICompilationUnit,
+ *      Name, int, int, Collection)
  */
 public class NewCUProposal extends ChangeCorrectionProposal {
-	private static String PACKAGEHEADER = "package_header";
-	private static String CURSOR = "cursor";
 
 	public static final int K_CLASS = 1;
 	public static final int K_INTERFACE = 2;
@@ -69,11 +71,19 @@ public class NewCUProposal extends ChangeCorrectionProposal {
 	private IType fCreatedType;
 
 	/**
-	 * @param name
-	 * @param kind
+	 * Construct a new compilation unit proposal.
+	 *
 	 * @param cu
-	 * @param change
+	 *            current compilation unit.
+	 * @param node
+	 *            {@link Name} corresponding to the compilation unit to be created.
+	 * @param typeKind
+	 *            possible values: { K_CLASS, K_INTERFACE, K_ENUM, K_ANNOTATION }
+	 * @param typeContainer
+	 *            enclosing {@link IJavaElement} of the target compilation unit, can
+	 *            be {@link IType} or {@link IPackageFragment}.
 	 * @param relevance
+	 *            the relevance of this proposal
 	 */
 	public NewCUProposal(ICompilationUnit cu, Name node, int typeKind, IJavaElement typeContainer, int relevance) {
 		super("", CodeActionKind.QuickFix, null, relevance); //$NON-NLS-1$
@@ -186,13 +196,20 @@ public class NewCUProposal extends ChangeCorrectionProposal {
 		}
 	}
 
+	private static boolean isParameterizedType(int typeKind, Name node) {
+		if (typeKind == K_CLASS || typeKind == K_INTERFACE) {
+			return node.getParent().getLocationInParent() == ParameterizedType.TYPE_PROPERTY;
+		}
+		return false;
+	}
+
 	private static String getTypeName(int typeKind, Name node) {
 		String name = ASTNodes.getSimpleNameIdentifier(node);
 
 		if (typeKind == K_CLASS || typeKind == K_INTERFACE) {
 			ASTNode parent = node.getParent();
 			if (parent.getLocationInParent() == ParameterizedType.TYPE_PROPERTY) {
-				String typeArgBaseName = name.startsWith(String.valueOf('T')) ? String.valueOf('S') : String.valueOf('T'); // use 'S' or 'T'
+				String typeArgBaseName = getTypeArgBaseName(name);
 
 				int nTypeArgs = ((ParameterizedType) parent.getParent()).typeArguments().size();
 				StringBuilder buf = new StringBuilder(name);
@@ -240,83 +257,107 @@ public class NewCUProposal extends ChangeCorrectionProposal {
 	protected Change createChange() throws CoreException {
 		IType targetType;
 		if (fTypeContainer instanceof IType) {
-			// e.g. OldClass.NewClass
 			IType enclosingType = (IType) fTypeContainer;
 			ICompilationUnit parentCU = enclosingType.getCompilationUnit();
 
-			ASTParser astParser = ASTParser.newParser(IASTSharedValues.SHARED_AST_LEVEL);
-			astParser.setSource(parentCU);
-			CompilationUnit cu = (CompilationUnit) astParser.createAST(null);
-			TypeDeclaration enclosingDecl = findEnclosingTypeDeclaration(cu, fTypeContainer.getElementName());
-
-			ASTRewrite rewrite = ASTRewrite.create(cu.getAST());
-			final AbstractTypeDeclaration newDeclaration;
-			switch (fTypeKind) {
-				case K_CLASS:
-					newDeclaration = cu.getAST().newTypeDeclaration();
-					((TypeDeclaration) newDeclaration).setInterface(false);
-					break;
-				case K_INTERFACE:
-					newDeclaration = cu.getAST().newTypeDeclaration();
-					((TypeDeclaration) newDeclaration).setInterface(true);
-					break;
-				case K_ENUM:
-					newDeclaration = cu.getAST().newEnumDeclaration();
-					break;
-				case K_ANNOTATION:
-					newDeclaration = cu.getAST().newAnnotationTypeDeclaration();
-					break;
-				default:
-					newDeclaration = null;
-			}
-
-			newDeclaration.setJavadoc(null);
-			newDeclaration.setName(cu.getAST().newSimpleName(fTypeNameWithParameters));
-
-			ListRewrite lrw = rewrite.getListRewrite(enclosingDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
-			lrw.insertLast(newDeclaration, null);
-
-			TextEdit res = rewrite.rewriteAST();
-
-			String label = "TODO";
-			CompilationUnitChange cuChange = new CompilationUnitChange(label, parentCU);
-			cuChange.setEdit(res);
+			CompilationUnitChange cuChange = new CompilationUnitChange(fName, parentCU);
+			TextEdit edit = constructEnclosingTypeEdit(parentCU);
+			cuChange.setEdit(edit);
 			return cuChange;
-
-			// TextFileChange: fillContent after last sibling
 		} else if (fTypeContainer instanceof IPackageFragment) {
 			String name = ASTNodes.getSimpleNameIdentifier(fNode);
 			ICompilationUnit parentCU = ((IPackageFragment) fTypeContainer).getCompilationUnit(getCompilationUnitName(name));
 			targetType = parentCU.getType(name);
 
-			// CreateFileChange: create class in /foo/bar/NewClass.java
-			CompositeChange change = new CompositeChange("");
+			CompositeChange change = new CompositeChange(fName);
 			change.add(new CreateFileChange(targetType.getResource().getRawLocation(), "", ""));
-
-			// Construct AST
-			ASTParser astParser = ASTParser.newParser(IASTSharedValues.SHARED_AST_LEVEL);
-			astParser.setSource(parentCU);
-			CompilationUnit cu = (CompilationUnit) astParser.createAST(null);
-
-			String lineDelimiter = StubUtility.getLineDelimiterUsed(fCompilationUnit.getJavaProject());
-			String typeStub = constructTypeStub(parentCU, name, Flags.AccPublic, lineDelimiter);
-			String cuContent = constructCUContent(parentCU, typeStub, lineDelimiter);
-
-			String label = "TODO";
-			CompilationUnitChange cuChange = new CompilationUnitChange(label, parentCU);
-			cuChange.setEdit(new InsertEdit(0, cuContent));
-			change.add(cuChange);
-
+			change.add(constructNewCUChange(parentCU));
 			return change;
 		} else {
 			return null;
 		}
 	}
 
-	// TODO: enable fileComment, typeComment
+	private TextEdit constructEnclosingTypeEdit(ICompilationUnit icu) throws CoreException {
+		ASTParser astParser = ASTParser.newParser(IASTSharedValues.SHARED_AST_LEVEL);
+		astParser.setSource(icu);
+		CompilationUnit cu = (CompilationUnit) astParser.createAST(null);
+		TypeDeclaration enclosingDecl = findEnclosingTypeDeclaration(cu, fTypeContainer.getElementName());
+		AST ast = cu.getAST();
+		ASTRewrite rewrite = ASTRewrite.create(ast);
+		final AbstractTypeDeclaration newDeclaration;
+		switch (fTypeKind) {
+			case K_CLASS:
+				newDeclaration = ast.newTypeDeclaration();
+				((TypeDeclaration) newDeclaration).setInterface(false);
+				break;
+			case K_INTERFACE:
+				newDeclaration = ast.newTypeDeclaration();
+				((TypeDeclaration) newDeclaration).setInterface(true);
+				break;
+			case K_ENUM:
+				newDeclaration = ast.newEnumDeclaration();
+				break;
+			case K_ANNOTATION:
+				newDeclaration = ast.newAnnotationTypeDeclaration();
+				break;
+			default:
+				return null;
+		}
+		newDeclaration.setJavadoc(null);
+		newDeclaration.setName(ast.newSimpleName(ASTNodes.getSimpleNameIdentifier(fNode)));
+		newDeclaration.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
+		if (isParameterizedType(fTypeKind, fNode)) {
+			addTypeParameters((TypeDeclaration) newDeclaration);
+		}
+
+		ListRewrite lrw = rewrite.getListRewrite(enclosingDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
+		lrw.insertLast(newDeclaration, null);
+		return rewrite.rewriteAST();
+	}
+
+	private void addTypeParameters(TypeDeclaration newDeclaration) {
+		if (isParameterizedType(fTypeKind, fNode)) {
+			String typeArgBaseName = getTypeArgBaseName(ASTNodes.getSimpleNameIdentifier(fNode));
+			int nTypeArgs = ((ParameterizedType) fNode.getParent().getParent()).typeArguments().size();
+			String[] typeArgNames = new String[nTypeArgs];
+			if (nTypeArgs == 1) {
+				typeArgNames[0] = typeArgBaseName;
+			} else {
+				for (int i = 0; i < nTypeArgs; i++) {
+					StringBuilder buf = new StringBuilder(typeArgBaseName);
+					buf.append(i + 1);
+					typeArgNames[i] = buf.toString();
+				}
+			}
+
+			AST ast = newDeclaration.getAST();
+			for (String typeArgName : typeArgNames) {
+				TypeParameter typeArg = ast.newTypeParameter();
+				typeArg.setName(ast.newSimpleName(typeArgName));
+				newDeclaration.typeParameters().add(typeArg);
+			}
+		}
+
+	}
+
+	private static String getTypeArgBaseName(String typeName) {
+		return typeName.startsWith(String.valueOf('T')) ? String.valueOf('S') : String.valueOf('T'); // use 'S' or 'T'
+	}
+
+	private CompilationUnitChange constructNewCUChange(ICompilationUnit cu) throws CoreException {
+		String lineDelimiter = StubUtility.getLineDelimiterUsed(fCompilationUnit.getJavaProject());
+		String typeStub = constructTypeStub(cu, fTypeNameWithParameters, Flags.AccPublic, lineDelimiter);
+		String cuContent = constructCUContent(cu, typeStub, lineDelimiter);
+		CompilationUnitChange cuChange = new CompilationUnitChange("", cu);
+		cuChange.setEdit(new InsertEdit(0, cuContent));
+		return cuChange;
+	}
+
+	// fileComment/typeComment not enabled.
 	private String constructCUContent(ICompilationUnit cu, String typeContent, String lineDelimiter) throws CoreException {
-		String fileComment = CodeGeneration.getFileComment(cu, lineDelimiter);
-		//		String typeComment= CodeGeneration.getTypeComment(cu, lineDelimiter, typeComment);
+		//		String fileComment = getFileComment(cu, lineDelimiter);
+		//		String typeComment = getTypeComment(cu, lineDelimiter);
 		IPackageFragment pack = (IPackageFragment) cu.getParent();
 		String content = CodeGeneration.getCompilationUnitContent(cu, null/*fileComment*/, null/*typeComment*/, typeContent, lineDelimiter);
 		if (content != null) {
@@ -385,16 +426,16 @@ public class NewCUProposal extends ChangeCorrectionProposal {
 		return buf.toString();
 	}
 
+	private static String getSimpleName(Name name) {
+		if (name.isQualifiedName()) {
+			return ((QualifiedName) name).getName().getIdentifier();
+		} else {
+			return ((SimpleName) name).getIdentifier();
+		}
+	}
+
 	private static String getCompilationUnitName(String typeName) {
 		return typeName + JavaModelUtil.DEFAULT_CU_SUFFIX;
-	}
-
-	public IType getCreatedType() {
-		return fCreatedType;
-	}
-
-	public int getTypeKind() {
-		return fTypeKind;
 	}
 
 }
