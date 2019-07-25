@@ -830,7 +830,7 @@ public class UnresolvedElementsSubProcessor {
 					}
 					if ((kind & TypeKinds.ANNOTATIONS) != 0) {
 						proposals.add(new NewCUProposal(cu, node, NewCUProposal.K_ANNOTATION, enclosing, rel + 1));
-						//						addNullityAnnotationTypesProposals(cu, node, proposals);
+						// TODO: addNullityAnnotationTypesProposals(cu, node, proposals);
 					}
 				}
 			}
