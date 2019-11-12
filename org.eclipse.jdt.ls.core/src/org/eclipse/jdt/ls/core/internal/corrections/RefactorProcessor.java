@@ -17,8 +17,10 @@ import java.util.List;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.ls.core.internal.corrections.proposals.CUCorrectionProposal;
 import org.eclipse.jdt.ls.core.internal.corrections.proposals.ChangeCorrectionProposal;
 import org.eclipse.jdt.ls.core.internal.preferences.PreferenceManager;
+import org.eclipse.jdt.ls.core.internal.text.correction.RefactorProposalUtility;
 import org.eclipse.lsp4j.CodeActionParams;
 
 /**
@@ -37,9 +39,26 @@ public class RefactorProcessor {
 		if (coveringNode != null) {
 			ArrayList<ChangeCorrectionProposal> proposals = new ArrayList<>();
 			// TODO (Yan): Move refactor proposals here.
+			getMoveRefactoringProposals(params, context, coveringNode, proposals);
 			return proposals;
 		}
 		return Collections.emptyList();
+	}
+
+	private boolean getMoveRefactoringProposals(CodeActionParams params, IInvocationContext context, ASTNode coveringNode, ArrayList<ChangeCorrectionProposal> resultingCollections) {
+		if (resultingCollections == null) {
+			return false;
+		}
+
+		if (this.preferenceManager.getClientPreferences().isMoveRefactoringSupported()) {
+			List<CUCorrectionProposal> newProposals = RefactorProposalUtility.getMoveRefactoringProposals(params, context);
+			if (newProposals != null && !newProposals.isEmpty()) {
+				resultingCollections.addAll(newProposals);
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 }
