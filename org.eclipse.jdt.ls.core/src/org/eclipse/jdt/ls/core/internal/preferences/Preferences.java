@@ -187,6 +187,13 @@ public class Preferences {
 	public static final List<String> JAVA_COMPLETION_FAVORITE_MEMBERS_DEFAULT;
 
 	/**
+	 * Preference key for maximum number of completion results to be returned.
+	 * Defaults to 30.
+	 */
+	public static final String JAVA_COMPLETION_MAX_RESULTS_KEY = "java.completion.maxResults";
+	public static final int JAVA_COMPLETION_MAX_RESULTS_DEFAULT = 30;
+
+	/**
 	 * A named preference that controls if the Java code assist only inserts
 	 * completions. When set to true, code completion overwrites the current text.
 	 * When set to false, code is simply added instead.
@@ -356,6 +363,7 @@ public class Preferences {
 	private Collection<IPath> triggerFiles;
 
 	private int parallelBuildsCount;
+	private int maxCompletionResults;
 
 	static {
 		JAVA_IMPORT_EXCLUSIONS_DEFAULT = new LinkedList<>();
@@ -465,6 +473,7 @@ public class Preferences {
 		importOrder = JAVA_IMPORT_ORDER_DEFAULT;
 		filteredTypes = JAVA_COMPLETION_FILTERED_TYPES_DEFAULT;
 		parallelBuildsCount = PreferenceInitializer.PREF_MAX_CONCURRENT_BUILDS_DEFAULT;
+		maxCompletionResults = JAVA_COMPLETION_MAX_RESULTS_DEFAULT;
 	}
 
 	/**
@@ -602,6 +611,8 @@ public class Preferences {
 		maxConcurrentBuilds = maxConcurrentBuilds >= 1 ? maxConcurrentBuilds : 1;
 		prefs.setMaxBuildCount(maxConcurrentBuilds);
 
+		int maxCompletions = getInt(configuration, JAVA_COMPLETION_MAX_RESULTS_KEY, JAVA_COMPLETION_MAX_RESULTS_DEFAULT);
+		prefs.setMaxCompletionResults(maxCompletions);
 		return prefs;
 	}
 
@@ -1038,7 +1049,17 @@ public class Preferences {
 		return javaFormatOnTypeEnabled;
 	}
 
-	public void setJavaFormatOnTypeEnabled(boolean javaFormatOnTypeEnabled) {
+	public Preferences setJavaFormatOnTypeEnabled(boolean javaFormatOnTypeEnabled) {
 		this.javaFormatOnTypeEnabled = javaFormatOnTypeEnabled;
+		return this;
+	}
+
+	public int getMaxCompletionResults() {
+		return maxCompletionResults;
+	}
+
+	public Preferences setMaxCompletionResults(int maxCompletions) {
+		this.maxCompletionResults = maxCompletions;
+		return this;
 	}
 }

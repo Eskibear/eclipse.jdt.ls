@@ -42,6 +42,7 @@ import org.eclipse.jdt.ls.core.internal.handlers.CompletionResolveHandler;
 import org.eclipse.jdt.ls.core.internal.handlers.CompletionResponse;
 import org.eclipse.jdt.ls.core.internal.handlers.CompletionResponses;
 import org.eclipse.jface.text.Region;
+import org.eclipse.jdt.ls.core.internal.preferences.PreferenceManager;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 
@@ -55,6 +56,12 @@ public final class CompletionProposalRequestor extends CompletionRequestor {
 	private CompletionResponse response;
 	private boolean fIsTestCodeExcluded;
 	private CompletionContext context;
+	private boolean isComplete = true;
+	private PreferenceManager preferenceManager;
+
+	public boolean isComplete() {
+		return isComplete;
+	}
 
 	// Update SUPPORTED_KINDS when mapKind changes
 	// @formatter:off
@@ -73,8 +80,9 @@ public final class CompletionProposalRequestor extends CompletionRequestor {
 																				CompletionItemKind.Text);
 	// @formatter:on
 
-	public CompletionProposalRequestor(ICompilationUnit aUnit, int offset) {
+	public CompletionProposalRequestor(ICompilationUnit aUnit, int offset, PreferenceManager preferenceManager) {
 		this.unit = aUnit;
+		this.preferenceManager = preferenceManager;
 		response = new CompletionResponse();
 		response.setOffset(offset);
 		fIsTestCodeExcluded = !isTestSource(unit.getJavaProject(), unit);
@@ -122,11 +130,31 @@ public final class CompletionProposalRequestor extends CompletionRequestor {
 	}
 
 	public List<CompletionItem> getCompletionItems() {
+		proposals.sort((p1, p2) -> {
+			int res = p2.getRelevance() - p1.getRelevance();
+			if (res == 0) {
+				res = p1.getCompletion().length - p2.getCompletion().length;
+			}
+			if (res == 0) {
+				res = String.valueOf(p2.getCompletion()).compareTo(String.valueOf(p1.getCompletion()));
+			}
+			return res;
+		});
 		response.setProposals(proposals);
 		CompletionResponses.store(response);
 		List<CompletionItem> completionItems = new ArrayList<>(proposals.size());
-		for (int i = 0; i < proposals.size(); i++) {
-			completionItems.add(toCompletionItem(proposals.get(i), i));
+		int maxCompletions = preferenceManager.getPreferences().getMaxCompletionResults();
+		if (proposals.size() > maxCompletions) {
+			//we keep receiving completions past our capacity so that makes the whole result incomplete
+			isComplete = false;
+		}
+
+		CompletionProposalReplacementProvider proposalProvider = new CompletionProposalReplacementProvider(unit, getContext(), response.getOffset(), preferenceManager.getClientPreferences());
+		for (int i = 0; i < Math.min(proposals.size(), maxCompletions); i++) {
+			CompletionProposal proposal = proposals.get(i);
+			CompletionItem item = toCompletionItem(proposal, i);
+			proposalProvider.updateReplacement(proposal, item, '\0');
+			completionItems.add(item);
 		}
 		return completionItems;
 	}
