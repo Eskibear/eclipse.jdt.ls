@@ -54,6 +54,8 @@ public class JDTDelegateCommandHandler implements IDelegateCommandHandler {
 					return BuildPathCommand.removeFromSourcePath(sourceFolder1);
 				case "java.project.listSourcePaths":
 					return BuildPathCommand.listSourcePaths();
+				case "java.completion.fullListForNext":
+					return fullListForNext();
 				default:
 					break;
 			}
@@ -61,4 +63,8 @@ public class JDTDelegateCommandHandler implements IDelegateCommandHandler {
 		throw new UnsupportedOperationException(String.format("Java language server doesn't support the command '%s'.", commandId));
 	}
 
+	private boolean fullListForNext() {
+		JavaLanguageServerPlugin.getPreferencesManager().getPreferences().setMaxCompletionResults(Integer.MAX_VALUE);
+		return true;
+	}
 }

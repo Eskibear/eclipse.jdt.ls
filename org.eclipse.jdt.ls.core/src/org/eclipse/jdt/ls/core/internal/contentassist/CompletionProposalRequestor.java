@@ -130,20 +130,22 @@ public final class CompletionProposalRequestor extends CompletionRequestor {
 	}
 
 	public List<CompletionItem> getCompletionItems() {
-		proposals.sort((p1, p2) -> {
-			int res = p2.getRelevance() - p1.getRelevance();
-			if (res == 0) {
-				res = p1.getCompletion().length - p2.getCompletion().length;
-			}
-			if (res == 0) {
-				res = String.valueOf(p2.getCompletion()).compareTo(String.valueOf(p1.getCompletion()));
-			}
-			return res;
-		});
+		int maxCompletions = preferenceManager.getPreferences().getMaxCompletionResults();
+		if (maxCompletions < Integer.MAX_VALUE) {
+			proposals.sort((p1, p2) -> {
+				int res = p2.getRelevance() - p1.getRelevance();
+				if (res == 0) {
+					res = p1.getCompletion().length - p2.getCompletion().length;
+				}
+				if (res == 0) {
+					res = String.valueOf(p2.getCompletion()).compareTo(String.valueOf(p1.getCompletion()));
+				}
+				return res;
+			});
+		}
 		response.setProposals(proposals);
 		CompletionResponses.store(response);
 		List<CompletionItem> completionItems = new ArrayList<>(proposals.size());
-		int maxCompletions = preferenceManager.getPreferences().getMaxCompletionResults();
 		if (proposals.size() > maxCompletions) {
 			//we keep receiving completions past our capacity so that makes the whole result incomplete
 			isComplete = false;

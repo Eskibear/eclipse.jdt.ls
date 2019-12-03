@@ -31,6 +31,7 @@ import org.eclipse.jdt.ls.core.internal.contentassist.CompletionProposalRequesto
 import org.eclipse.jdt.ls.core.internal.contentassist.JavadocCompletionProposal;
 import org.eclipse.jdt.ls.core.internal.contentassist.SnippetCompletionProposal;
 import org.eclipse.jdt.ls.core.internal.preferences.PreferenceManager;
+import org.eclipse.jdt.ls.core.internal.preferences.Preferences;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionOptions;
@@ -74,6 +75,9 @@ public class CompletionHandler{
 			JavaLanguageServerPlugin.logInfo("Completion request cancelled");
 		} else {
 			JavaLanguageServerPlugin.logInfo("Completion request completed");
+		}
+		if (!$.isIncomplete()) {
+			JavaLanguageServerPlugin.getPreferencesManager().getPreferences().setMaxCompletionResults(Preferences.JAVA_COMPLETION_MAX_RESULTS_DEFAULT);
 		}
 		return Either.forRight($);
 	}
