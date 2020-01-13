@@ -19,6 +19,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.ls.core.internal.commands.BuildPathCommand;
 import org.eclipse.jdt.ls.core.internal.commands.OrganizeImportsCommand;
 import org.eclipse.jdt.ls.core.internal.commands.SourceAttachmentCommand;
+import org.eclipse.jdt.ls.core.internal.handlers.CompletionHandler;
 import org.eclipse.lsp4j.WorkspaceEdit;
 
 public class JDTDelegateCommandHandler implements IDelegateCommandHandler {
@@ -56,11 +57,18 @@ public class JDTDelegateCommandHandler implements IDelegateCommandHandler {
 					return BuildPathCommand.removeFromSourcePath(sourceFolder1);
 				case "java.project.listSourcePaths":
 					return BuildPathCommand.listSourcePaths();
+				case "java.completion.allScopeForNext":
+					return allScopeForNext();
 				default:
 					break;
 			}
 		}
 		throw new UnsupportedOperationException(String.format("Java language server doesn't support the command '%s'.", commandId));
+	}
+
+	private boolean allScopeForNext() {
+		CompletionHandler.nextFullScope = true;
+		return true;
 	}
 
 }

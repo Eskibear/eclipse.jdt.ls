@@ -69,6 +69,9 @@
             <command
                   id="java.project.listSourcePaths">
             </command>
+            <command
+                  id="java.completion.allScopeForNext">
+            </command>
       </delegateCommandHandler>
    </extension>
    <extension
@@ -77,7 +80,7 @@
          <importer
             id = "gradleProjectImporter"
             order ="300"
-            class = "org.eclipse.jdt.ls.core.internal.managers.GradleProjectImporter"/> 
+            class = "org.eclipse.jdt.ls.core.internal.managers.GradleProjectImporter"/>
          <importer
             id = "mavenProjectImporter"
             order = "400"

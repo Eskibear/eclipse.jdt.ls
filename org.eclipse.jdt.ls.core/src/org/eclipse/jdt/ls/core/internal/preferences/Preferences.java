@@ -215,6 +215,16 @@ public class Preferences {
 	public static final int JAVA_COMPLETION_MAX_RESULTS_DEFAULT = 50;
 
 	/**
+	 * Preference key for completion scope mask.
+	 * 1: source
+	 * 2: app lib
+	 * 4: sys lib
+	 * 8: ref projects
+	 */
+	public static final String JAVA_COMPLETION_SCOPE_MASK_KEY = "java.completion.scopeMask";
+	public static final int JAVA_COMPLETION_SCOPE_MASK_DEFAULT = 1 + 4 + 8;
+
+	/**
 	 * A named preference that controls if the Java code assist only inserts
 	 * completions. When set to true, code completion overwrites the current text.
 	 * When set to false, code is simply added instead.
@@ -388,6 +398,7 @@ public class Preferences {
 	private Collection<IPath> triggerFiles;
 	private int parallelBuildsCount;
 	private int maxCompletionResults;
+	private int scopeMask;
 
 	static {
 		JAVA_IMPORT_EXCLUSIONS_DEFAULT = new LinkedList<>();
@@ -718,6 +729,9 @@ public class Preferences {
 
 		int maxCompletions = getInt(configuration, JAVA_COMPLETION_MAX_RESULTS_KEY, JAVA_COMPLETION_MAX_RESULTS_DEFAULT);
 		prefs.setMaxCompletionResults(maxCompletions);
+
+		int scopeMask = getInt(configuration, JAVA_COMPLETION_SCOPE_MASK_KEY, JAVA_COMPLETION_SCOPE_MASK_DEFAULT);
+		prefs.setScopeMask(scopeMask);
 
 		return prefs;
 	}
@@ -1201,6 +1215,15 @@ public class Preferences {
 		} else {
 			this.maxCompletionResults = maxCompletions;
 		}
+		return this;
+	}
+
+	public int getScopeMask() {
+		return scopeMask;
+	}
+
+	public Preferences setScopeMask(int scopeMask) {
+		this.scopeMask = scopeMask;
 		return this;
 	}
 

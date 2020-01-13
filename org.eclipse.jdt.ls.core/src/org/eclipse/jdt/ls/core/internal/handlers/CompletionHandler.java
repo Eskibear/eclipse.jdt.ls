@@ -27,6 +27,7 @@ import org.eclipse.jdt.core.CompletionProposal;
 import org.eclipse.jdt.core.IBuffer;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.internal.core.Openable;
 import org.eclipse.jdt.ls.core.internal.JDTUtils;
 import org.eclipse.jdt.ls.core.internal.JavaLanguageServerPlugin;
 import org.eclipse.jdt.ls.core.internal.contentassist.CompletionProposalRequestor;
@@ -46,6 +47,8 @@ public class CompletionHandler{
 
 	public final static CompletionOptions DEFAULT_COMPLETION_OPTIONS = new CompletionOptions(Boolean.TRUE, Arrays.asList(".", "@", "#", "*"));
 	private static final Set<String> UNSUPPORTED_RESOURCES = Sets.newHashSet("module-info.java", "package-info.java");
+
+	public static boolean nextFullScope = false;
 
 	static final Comparator<CompletionItem> PROPOSAL_COMPARATOR = new Comparator<CompletionItem>() {
 
@@ -143,6 +146,14 @@ public class CompletionHandler{
 
 				};
 				try {
+					if (unit instanceof Openable) {
+						if (nextFullScope) {
+							((Openable) unit).scopeMask = 15;
+							nextFullScope = false;
+						} else {
+							((Openable) unit).scopeMask = manager.getPreferences().getScopeMask();
+						}
+					}
 					unit.codeComplete(offset, collector, subMonitor);
 					proposals.addAll(collector.getCompletionItems());
 					if (isSnippetStringSupported() && !UNSUPPORTED_RESOURCES.contains(unit.getResource().getName())) {
