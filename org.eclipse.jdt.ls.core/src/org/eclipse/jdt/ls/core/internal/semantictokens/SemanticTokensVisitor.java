@@ -16,19 +16,22 @@ import org.eclipse.jdt.core.dom.NumberLiteral;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.StringLiteral;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.Modifier.ModifierKeyword;
 import org.eclipse.jdt.ls.core.internal.handlers.JsonRpcHelpers;
 import org.eclipse.jface.text.IDocument;
 
 public class SemanticTokensVisitor extends ASTVisitor {
     private ICompilationUnit cu;
     private IDocument document;
+    private SemanticTokenManager manager;
     private List<SemanticToken> tokens;
     private SemanticTokensLegend legend;
 
-    public SemanticTokensVisitor(ICompilationUnit cu, IDocument document) {
+    public SemanticTokensVisitor(ICompilationUnit cu, IDocument document, SemanticTokenManager manager) {
+        this.manager = manager;
         this.cu = cu;
         this.document = document;
-        this.legend = SemanticTokensLegend.getInstance();
+        this.legend = manager.getLegend();
         this.tokens = new ArrayList<>();
     }
 
@@ -51,10 +54,10 @@ public class SemanticTokensVisitor extends ASTVisitor {
             }
             int deltaColumn = column - currentColumn;
             int tokenTypeIndex = legend.getTokenTypes().indexOf(token.getTokenType().toString());
-            TokenModifier[] modifiers = token.getTokenModifiers();
+            ITokenModifier[] modifiers = token.getTokenModifiers();
             int m = 0;
-            for (TokenModifier modifier : modifiers) {
-                int bit = legend.getTokenModifiers().indexOf(modifier.toString());
+            for (ITokenModifier modifier : modifiers) {
+                int bit = manager.getTokenModifiers().indexOf(modifier);
                 if (bit >= 0) {
                     m = m | (0b00000001 << bit);
                 }
@@ -63,16 +66,16 @@ public class SemanticTokensVisitor extends ASTVisitor {
             data.add(deltaColumn);
             data.add(token.getLength());
             data.add(tokenTypeIndex);
-            data.add(m); // TODO: modifiers
+            data.add(m);
         }
         return data;
     }
 
     private void addToken(ASTNode node, TokenType tokenType) {
-        addToken(node, tokenType, new TokenModifier[] {});
+        addToken(node, tokenType, new ITokenModifier[] {});
     }
 
-    private void addToken(ASTNode node, TokenType tokenType, TokenModifier[] modifiers) {
+    private void addToken(ASTNode node, TokenType tokenType, ITokenModifier[] modifiers) {
         int offset = node.getStartPosition();
         int length = node.getLength();
         SemanticToken token = new SemanticToken(this.document, offset, length, tokenType, modifiers);
@@ -108,6 +111,7 @@ public class SemanticTokensVisitor extends ASTVisitor {
 
     @Override
     public boolean visit(SimpleName node) {
+
         IBinding binding = node.resolveBinding();
 
         if (binding != null) {
@@ -128,20 +132,13 @@ public class SemanticTokensVisitor extends ASTVisitor {
             }
 
             if (tokenType != null) {
-                List<TokenModifier> modifierList = new ArrayList<>();
-                int mod = binding.getModifiers();
-                if ((mod & Modifier.STATIC) == Modifier.STATIC) {
-                    modifierList.add(TokenModifier.STATIC);
+                List<ITokenModifier> modifierList = new ArrayList<>();
+                for (ITokenModifier tokenModifier : manager.getTokenModifiers().values()) {
+                    if (tokenModifier.applies(binding)) {
+                        modifierList.add(tokenModifier);
+                    }
                 }
-                if ((mod & Modifier.FINAL) == Modifier.FINAL) {
-                    modifierList.add(TokenModifier.READ_ONLY);
-                }
-
-                if (binding.isDeprecated()) {
-                    modifierList.add(TokenModifier.DEPRECATED);
-                }
-
-                TokenModifier[] modifiers = new TokenModifier[modifierList.size()];
+                ITokenModifier[] modifiers = new ITokenModifier[modifierList.size()];
                 modifierList.toArray(modifiers);
                 addToken(node, tokenType, modifiers);
             }

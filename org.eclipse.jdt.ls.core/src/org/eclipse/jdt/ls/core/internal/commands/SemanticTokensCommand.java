@@ -10,6 +10,7 @@ import org.eclipse.jdt.core.manipulation.CoreASTProvider;
 import org.eclipse.jdt.ls.core.internal.JDTUtils;
 import org.eclipse.jdt.ls.core.internal.JavaLanguageServerPlugin;
 import org.eclipse.jdt.ls.core.internal.handlers.JsonRpcHelpers;
+import org.eclipse.jdt.ls.core.internal.semantictokens.SemanticTokenManager;
 import org.eclipse.jdt.ls.core.internal.semantictokens.SemanticTokens;
 import org.eclipse.jdt.ls.core.internal.semantictokens.SemanticTokensLegend;
 import org.eclipse.jdt.ls.core.internal.semantictokens.SemanticTokensVisitor;
@@ -32,14 +33,14 @@ public class SemanticTokensCommand {
         }
 
 
-        SemanticTokensVisitor collector = new SemanticTokensVisitor(cu, document);
+        SemanticTokensVisitor collector = new SemanticTokensVisitor(cu, document, SemanticTokenManager.getInstance());
         CompilationUnit root = CoreASTProvider.getInstance().getAST(cu, CoreASTProvider.WAIT_YES, new NullProgressMonitor());
         root.accept(collector);
         return collector.getSemanticTokens();
     }
 
     public static SemanticTokensLegend getLegend() {
-		return SemanticTokensLegend.getInstance();
+        return SemanticTokenManager.getInstance().getLegend();
     }
 
 

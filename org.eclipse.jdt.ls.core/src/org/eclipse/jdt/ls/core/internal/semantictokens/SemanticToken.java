@@ -5,13 +5,13 @@ import org.eclipse.jface.text.IDocument;
 
 public class SemanticToken {
     private TokenType tokenType;
-    private TokenModifier[] tokenModifiers;
+    private ITokenModifier[] tokenModifiers;
     private int offset;
     private int length;
     private IDocument document;
-    private String text;
+    private String text;// TODO:???
 
-    public SemanticToken(IDocument document, int offset, int length, TokenType tokenType, TokenModifier[] tokenModifiers) {
+    public SemanticToken(IDocument document, int offset, int length, TokenType tokenType, ITokenModifier[] tokenModifiers) {
         this.document = document;
         this.offset = offset;
         this.length = length;
@@ -33,11 +33,11 @@ public class SemanticToken {
         this.tokenType = tokenType;
     }
 
-    public TokenModifier[] getTokenModifiers() {
+    public ITokenModifier[] getTokenModifiers() {
         return tokenModifiers;
     }
 
-    public void setTokenModifiers(TokenModifier[] tokenModifiers) {
+    public void setTokenModifiers(ITokenModifier[] tokenModifiers) {
         this.tokenModifiers = tokenModifiers;
     }
 
