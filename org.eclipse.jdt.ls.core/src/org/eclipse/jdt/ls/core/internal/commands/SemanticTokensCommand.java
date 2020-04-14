@@ -1,6 +1,17 @@
-package org.eclipse.jdt.ls.core.internal.commands;
+/*******************************************************************************
+ * Copyright (c) 2020 Microsoft Corporation and others.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Microsoft Corporation - initial API and implementation
+ *******************************************************************************/
 
-import java.util.List;
+package org.eclipse.jdt.ls.core.internal.commands;
 
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -23,7 +34,6 @@ public class SemanticTokensCommand {
         IDocument document = null;
 
         ICompilationUnit cu = JDTUtils.resolveCompilationUnit(uri);
-        //ignoring working copies, they're handled in the DocumentLifecycleHandler
         if (cu != null) {
             try {
                 document = JsonRpcHelpers.toDocument(cu.getBuffer());
@@ -32,8 +42,7 @@ public class SemanticTokensCommand {
             }
         }
 
-
-        SemanticTokensVisitor collector = new SemanticTokensVisitor(cu, document, SemanticTokenManager.getInstance());
+        SemanticTokensVisitor collector = new SemanticTokensVisitor(document, SemanticTokenManager.getInstance());
         CompilationUnit root = CoreASTProvider.getInstance().getAST(cu, CoreASTProvider.WAIT_YES, new NullProgressMonitor());
         root.accept(collector);
         return collector.getSemanticTokens();

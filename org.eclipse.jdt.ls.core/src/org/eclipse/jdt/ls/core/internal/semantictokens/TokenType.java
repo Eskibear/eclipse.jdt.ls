@@ -1,16 +1,19 @@
+/*******************************************************************************
+ * Copyright (c) 2020 Microsoft Corporation and others.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Microsoft Corporation - initial API and implementation
+ *******************************************************************************/
+
 package org.eclipse.jdt.ls.core.internal.semantictokens;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public enum TokenType {
-    CLASS("class"),
-    INTERFACE("interface"),
-    ENUM("enum"),
-    TYPE_PARAMETER("typeParameter"),
-
-    NUMBER("number"),
-    STRING("string"),
     VARIABLE("variable"),
     METHOD("method"),
     ;
@@ -22,14 +25,5 @@ public enum TokenType {
 
     public String toString() {
         return this.literalString;
-    }
-
-    public static List<String> getAll() {
-        TokenType[] allTypes = TokenType.values();
-        List<String> list = new ArrayList<>(allTypes.length);
-        for (TokenType tokenType : allTypes) {
-            list.add(tokenType.toString());
-        }
-        return list;
     }
 }
