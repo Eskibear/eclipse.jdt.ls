@@ -643,6 +643,8 @@ public class CompletionHandlerTest extends AbstractCompilationUnitBasedTest {
 
 		assertNotNull(ci.getTextEdit());
 		assertTextEdit(5, 4, 6, "put", ci.getTextEdit());
+
+		ci = server.resolveCompletionItem(ci).join();
 		assertNotNull(ci.getAdditionalTextEdits());
 		List<TextEdit> edits = ci.getAdditionalTextEdits();
 		assertEquals(2, edits.size());
@@ -681,6 +683,8 @@ public class CompletionHandlerTest extends AbstractCompilationUnitBasedTest {
 			//In case the JDK has no sources
 			assertTextEdit(5, 4, 6, "put(${1:arg0}, ${2:arg1})", ci.getTextEdit());
 		}
+
+		ci = server.resolveCompletionItem(ci).join();
 		assertNotNull(ci.getAdditionalTextEdits());
 		List<TextEdit> edits = ci.getAdditionalTextEdits();
 		assertEquals(2, edits.size());
@@ -1713,8 +1717,10 @@ public class CompletionHandlerTest extends AbstractCompilationUnitBasedTest {
 				"}";
 
 		assertEquals(expectedText, text);
-		assertEquals("Missing required imports", 1, oride.getAdditionalTextEdits().size());
 
+		oride = server.resolveCompletionItem(oride).join();
+		assertEquals("Missing required imports", 1, oride.getAdditionalTextEdits().size());
+		// TODO(eskibear): below line fails
 		assertEquals("\n\nimport java.io.File;\n\n", oride.getAdditionalTextEdits().get(0).getNewText());
 		assertPosition(0, 19, oride.getAdditionalTextEdits().get(0).getRange().getStart());
 		assertPosition(2, 0, oride.getAdditionalTextEdits().get(0).getRange().getEnd());
@@ -1749,7 +1755,10 @@ public class CompletionHandlerTest extends AbstractCompilationUnitBasedTest {
 				"}";
 
 		assertEquals(expectedText, text);
+
+		oride = server.resolveCompletionItem(oride).join();
 		assertEquals("Missing required imports", 1, oride.getAdditionalTextEdits().size());
+		// TODO(eskibear): below line fails
 		assertEquals("\n\nimport java.io.IOException;\n\n", oride.getAdditionalTextEdits().get(0).getNewText());
 		assertPosition(0, 19, oride.getAdditionalTextEdits().get(0).getRange().getStart());
 		assertPosition(2, 0, oride.getAdditionalTextEdits().get(0).getRange().getEnd());
@@ -1811,7 +1820,7 @@ public class CompletionHandlerTest extends AbstractCompilationUnitBasedTest {
 				"	return strField;\n" +
 				"}", ci.getTextEdit());
 	}
-	
+
 	@Test
 	public void testCompletion_getterNoJavadoc() throws Exception {
 		preferences.setCodeGenerationTemplateGenerateComments(false);
@@ -1836,7 +1845,7 @@ public class CompletionHandlerTest extends AbstractCompilationUnitBasedTest {
 		assertEquals(CompletionItemKind.Method, ci.getKind());
 		assertEquals("999999979", ci.getSortText());
 		assertNotNull(ci.getTextEdit());
-		assertTextEdit(2, 4, 7, 
+		assertTextEdit(2, 4, 7,
 				"public String getStrField() {\n" +
 				"	return strField;\n" +
 				"}", ci.getTextEdit());
@@ -2681,9 +2690,11 @@ public class CompletionHandlerTest extends AbstractCompilationUnitBasedTest {
 			assertTrue(list.getItems().size() > 0);
 			CompletionItem item = list.getItems().stream().filter(i -> "ArrayList()".equals(i.getLabel())).collect(Collectors.toList()).get(0);
 			assertNotNull(item);
+			item = server.resolveCompletionItem(item).join();
 			List<TextEdit> textEdits = item.getAdditionalTextEdits();
 			assertEquals(1, textEdits.size());
 			TextEdit textEdit = textEdits.get(0);
+			// TODO(eskibear): below line fails
 			assertEquals("\n\nimport java.util.*;", textEdit.getNewText());
 			loc = findCompletionLocation(unit, "= abs");
 			list = server.completion(JsonMessageHelper.getParams(createCompletionRequest(unit, loc[0], loc[1]))).join().getRight();
@@ -2691,6 +2702,7 @@ public class CompletionHandlerTest extends AbstractCompilationUnitBasedTest {
 			assertTrue(list.getItems().size() > 0);
 			item = list.getItems().stream().filter(i -> i.getLabel().startsWith("abs(double")).collect(Collectors.toList()).get(0);
 			assertNotNull(item);
+			item = server.resolveCompletionItem(item).join();
 			textEdits = item.getAdditionalTextEdits();
 			assertEquals(1, textEdits.size());
 			textEdit = textEdits.get(0);

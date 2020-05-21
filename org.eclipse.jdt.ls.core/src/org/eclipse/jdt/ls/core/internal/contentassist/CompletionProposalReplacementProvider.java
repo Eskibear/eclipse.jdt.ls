@@ -66,7 +66,7 @@ import org.eclipse.text.edits.TextEdit;
  *
  * @author aboyko
  *
- * Copied from Flux project.
+ *         Copied from Flux project.
  *
  */
 public class CompletionProposalReplacementProvider {
@@ -77,8 +77,8 @@ public class CompletionProposalReplacementProvider {
 	private static final char RPAREN = ')';
 	private static final char SEMICOLON = ';';
 	private static final char COMMA = ',';
-	private static final char LESS= '<';
-	private static final char GREATER= '>';
+	private static final char LESS = '<';
+	private static final char GREATER = '>';
 	private final ICompilationUnit compilationUnit;
 	private final int offset;
 	private final CompletionContext context;
@@ -93,6 +93,53 @@ public class CompletionProposalReplacementProvider {
 		this.offset = offset;
 		this.preferences = preferences == null ? new Preferences() : preferences;
 		this.client = clientPrefs;
+	}
+
+	public void updateAdditonalTextEdits(CompletionProposal proposal, CompletionItem item, char trigger) {
+		// reset importRewrite
+		this.importRewrite = TypeProposalUtils.createImportRewrite(compilationUnit);
+
+		List<org.eclipse.lsp4j.TextEdit> additionalTextEdits = new ArrayList<>();
+
+		if (isSupportingRequiredProposals(proposal)) {
+			CompletionProposal[] requiredProposals = proposal.getRequiredProposals();
+			if (requiredProposals != null) {
+				for (CompletionProposal requiredProposal : requiredProposals) {
+					switch (requiredProposal.getKind()) {
+						case CompletionProposal.TYPE_IMPORT:
+						case CompletionProposal.METHOD_IMPORT:
+						case CompletionProposal.FIELD_IMPORT:
+							break;
+						case CompletionProposal.TYPE_REF:
+							org.eclipse.lsp4j.TextEdit edit = toRequiredTypeEdit(requiredProposal, trigger, proposal.canUseDiamond(context));
+							if (proposal.getKind() == CompletionProposal.CONSTRUCTOR_INVOCATION || proposal.getKind() == CompletionProposal.ANONYMOUS_CLASS_CONSTRUCTOR_INVOCATION
+									|| proposal.getKind() == CompletionProposal.ANONYMOUS_CLASS_DECLARATION) {
+								// do nothing
+							} else {
+								additionalTextEdits.add(edit);
+							}
+							break;
+						default:
+							/*
+							 * In 3.3 we only support the above required proposals, see
+							 * CompletionProposal#getRequiredProposals()
+							 */
+							Assert.isTrue(false);
+					}
+				}
+			}
+		}
+
+		if (proposal.getKind() == CompletionProposal.TYPE_REF) {
+			String qualifiedTypeName = SignatureUtil.getQualifiedTypeName(proposal);
+			if (importRewrite != null) {
+				importRewrite.addImport(qualifiedTypeName, null);
+			}
+		}
+		addImports(additionalTextEdits);
+		if (!additionalTextEdits.isEmpty()) {
+			item.setAdditionalTextEdits(additionalTextEdits);
+		}
 	}
 
 	/**
@@ -111,31 +158,30 @@ public class CompletionProposalReplacementProvider {
 		StringBuilder completionBuffer = new StringBuilder();
 		Range range = null;
 		if (isSupportingRequiredProposals(proposal)) {
-			CompletionProposal[] requiredProposals= proposal.getRequiredProposals();
+			CompletionProposal[] requiredProposals = proposal.getRequiredProposals();
 			if (requiredProposals != null) {
 				for (CompletionProposal requiredProposal : requiredProposals) {
-					switch(requiredProposal.getKind()) {
-					case CompletionProposal.TYPE_IMPORT:
-					case CompletionProposal.METHOD_IMPORT:
-					case CompletionProposal.FIELD_IMPORT:
-						appendImportProposal(completionBuffer, requiredProposal, proposal.getKind());
-						break;
-					case CompletionProposal.TYPE_REF:
-						org.eclipse.lsp4j.TextEdit edit = toRequiredTypeEdit(requiredProposal, trigger, proposal.canUseDiamond(context));
+					switch (requiredProposal.getKind()) {
+						case CompletionProposal.TYPE_IMPORT:
+						case CompletionProposal.METHOD_IMPORT:
+						case CompletionProposal.FIELD_IMPORT:
+							break;
+						case CompletionProposal.TYPE_REF:
+							org.eclipse.lsp4j.TextEdit edit = toRequiredTypeEdit(requiredProposal, trigger, proposal.canUseDiamond(context));
 							if (proposal.getKind() == CompletionProposal.CONSTRUCTOR_INVOCATION || proposal.getKind() == CompletionProposal.ANONYMOUS_CLASS_CONSTRUCTOR_INVOCATION
 									|| proposal.getKind() == CompletionProposal.ANONYMOUS_CLASS_DECLARATION) {
-							completionBuffer.append(edit.getNewText());
-							range = edit.getRange();
-						} else {
-							additionalTextEdits.add(edit);
-						}
-						break;
-					default:
-						/*
-						 * In 3.3 we only support the above required proposals, see
-						 * CompletionProposal#getRequiredProposals()
-						 */
-						Assert.isTrue(false);
+								completionBuffer.append(edit.getNewText());
+								range = edit.getRange();
+							} else {
+								additionalTextEdits.add(edit);
+							}
+							break;
+						default:
+							/*
+							 * In 3.3 we only support the above required proposals, see
+							 * CompletionProposal#getRequiredProposals()
+							 */
+							Assert.isTrue(false);
 					}
 				}
 			}
@@ -152,7 +198,7 @@ public class CompletionProposalReplacementProvider {
 			}
 			range = toReplacementRange(proposal);
 		}
-		if(proposal.getKind() == CompletionProposal.METHOD_DECLARATION){
+		if (proposal.getKind() == CompletionProposal.METHOD_DECLARATION) {
 			appendMethodOverrideReplacement(completionBuffer, proposal);
 		} else if (proposal.getKind() == CompletionProposal.POTENTIAL_METHOD_DECLARATION && proposal instanceof GetterSetterCompletionProposal) {
 			appendMethodPotentialReplacement(completionBuffer, (GetterSetterCompletionProposal) proposal);
@@ -162,21 +208,17 @@ public class CompletionProposalReplacementProvider {
 			appendReplacementString(completionBuffer, proposal);
 		}
 		//select insertTextFormat.
-		if( client.isCompletionSnippetsSupported()){
+		if (client.isCompletionSnippetsSupported()) {
 			item.setInsertTextFormat(InsertTextFormat.Snippet);
-		}else{
+		} else {
 			item.setInsertTextFormat(InsertTextFormat.PlainText);
 		}
 		String text = completionBuffer.toString();
-		if(range != null){
+		if (range != null) {
 			item.setTextEdit(new org.eclipse.lsp4j.TextEdit(range, text));
-		}else{
+		} else {
 			// fallback
 			item.setInsertText(text);
-		}
-		addImports(additionalTextEdits);
-		if(!additionalTextEdits.isEmpty()){
-			item.setAdditionalTextEdits(additionalTextEdits);
 		}
 	}
 
@@ -291,15 +333,12 @@ public class CompletionProposalReplacementProvider {
 		try {
 			document = JsonRpcHelpers.toDocument(this.compilationUnit.getBuffer());
 			String signature = String.valueOf(proposal.getSignature());
-			String[] types = Stream.of(Signature.getParameterTypes(signature)).map(t -> Signature.toString(t))
-					.toArray(String[]::new);
+			String[] types = Stream.of(Signature.getParameterTypes(signature)).map(t -> Signature.toString(t)).toArray(String[]::new);
 			String methodName = String.valueOf(proposal.getName());
 			int offset = proposal.getReplaceStart();
 			String completion = new String(proposal.getCompletion());
-			OverrideCompletionProposal overrider = new OverrideCompletionProposal(compilationUnit, methodName, types,
-					completion);
-			String replacement = overrider.updateReplacementString(document, offset, importRewrite,
-					client.isCompletionSnippetsSupported());
+			OverrideCompletionProposal overrider = new OverrideCompletionProposal(compilationUnit, methodName, types, completion);
+			String replacement = overrider.updateReplacementString(document, offset, importRewrite, client.isCompletionSnippetsSupported());
 			completionBuffer.append(replacement);
 		} catch (BadLocationException | CoreException e) {
 			JavaLanguageServerPlugin.logException("Failed to compute override replacement", e);
@@ -315,8 +354,7 @@ public class CompletionProposalReplacementProvider {
 		try {
 			document = JsonRpcHelpers.toDocument(this.compilationUnit.getBuffer());
 			int offset = proposal.getReplaceStart();
-			String replacement = proposal.updateReplacementString(document, offset, importRewrite,
-					client.isCompletionSnippetsSupported(), preferences.isCodeGenerationTemplateGenerateComments());
+			String replacement = proposal.updateReplacementString(document, offset, importRewrite, client.isCompletionSnippetsSupported(), preferences.isCodeGenerationTemplateGenerateComments());
 			completionBuffer.append(replacement);
 		} catch (BadLocationException | CoreException e) {
 			JavaLanguageServerPlugin.logException("Failed to compute potential replacement", e);
@@ -329,15 +367,15 @@ public class CompletionProposalReplacementProvider {
 			completionBuffer.replace(0, completionBuffer.toString().length(), replace);
 		}
 		completionBuffer.append(" {\n\t");
-		if (client.isCompletionSnippetsSupported())  {
+		if (client.isCompletionSnippetsSupported()) {
 			completionBuffer.append(CURSOR_POSITION);
 			completionBuffer.append("\n}");
-		}//if Snippets not supported, we leave an open bracket so users can type in directly
+		} //if Snippets not supported, we leave an open bracket so users can type in directly
 	}
 
-	private Range toReplacementRange(CompletionProposal proposal){
+	private Range toReplacementRange(CompletionProposal proposal) {
 		try {
-			return JDTUtils.toRange(compilationUnit, proposal.getReplaceStart(), proposal.getReplaceEnd()-proposal.getReplaceStart());
+			return JDTUtils.toRange(compilationUnit, proposal.getReplaceStart(), proposal.getReplaceEnd() - proposal.getReplaceStart());
 		} catch (JavaModelException e) {
 			JavaLanguageServerPlugin.logException(e.getMessage(), e);
 		}
@@ -346,37 +384,34 @@ public class CompletionProposalReplacementProvider {
 
 	/**
 	 * Adds imports collected by importRewrite to item
+	 *
 	 * @param item
 	 */
 	private void addImports(List<org.eclipse.lsp4j.TextEdit> additionalEdits) {
-		if(this.importRewrite != null ){
+		if (this.importRewrite != null) {
 			try {
-				TextEdit edit =  this.importRewrite.rewriteImports(new NullProgressMonitor());
+				TextEdit edit = this.importRewrite.rewriteImports(new NullProgressMonitor());
 				TextEditConverter converter = new TextEditConverter(this.compilationUnit, edit);
 				List<org.eclipse.lsp4j.TextEdit> edits = converter.convert();
 				if (ChangeUtil.hasChanges(edits)) {
 					additionalEdits.addAll(edits);
 				}
 			} catch (CoreException e) {
-				JavaLanguageServerPlugin.logException("Error adding imports",e);
+				JavaLanguageServerPlugin.logException("Error adding imports", e);
 			}
 		}
 	}
 
 	private boolean isSupportingRequiredProposals(CompletionProposal proposal) {
-		return proposal != null
-				&& (proposal.getKind() == CompletionProposal.METHOD_REF
-				|| proposal.getKind() == CompletionProposal.FIELD_REF
-				|| proposal.getKind() == CompletionProposal.TYPE_REF
-						|| proposal.getKind() == CompletionProposal.CONSTRUCTOR_INVOCATION || proposal.getKind() == CompletionProposal.ANONYMOUS_CLASS_CONSTRUCTOR_INVOCATION
-						|| proposal.getKind() == CompletionProposal.ANONYMOUS_CLASS_DECLARATION);
+		return proposal != null && (proposal.getKind() == CompletionProposal.METHOD_REF || proposal.getKind() == CompletionProposal.FIELD_REF || proposal.getKind() == CompletionProposal.TYPE_REF
+				|| proposal.getKind() == CompletionProposal.CONSTRUCTOR_INVOCATION || proposal.getKind() == CompletionProposal.ANONYMOUS_CLASS_CONSTRUCTOR_INVOCATION || proposal.getKind() == CompletionProposal.ANONYMOUS_CLASS_DECLARATION);
 	}
 
 	protected boolean hasArgumentList(CompletionProposal proposal) {
 		if (CompletionProposal.METHOD_NAME_REFERENCE == proposal.getKind()) {
 			return false;
 		}
-		char[] completion= proposal.getCompletion();
+		char[] completion = proposal.getCompletion();
 		return !isInJavadoc() && completion.length > 0 && completion[completion.length - 1] == RPAREN;
 	}
 
@@ -396,8 +431,8 @@ public class CompletionProposalReplacementProvider {
 
 		// we're inserting a method plus the argument list - respect formatter preferences
 		appendMethodNameReplacement(buffer, proposal);
-		final boolean addParen  = client.isCompletionSnippetsSupported();
-		if(addParen) {
+		final boolean addParen = client.isCompletionSnippetsSupported();
+		if (addParen) {
 			buffer.append(LPAREN);
 		}
 
@@ -405,21 +440,20 @@ public class CompletionProposalReplacementProvider {
 			appendGuessingCompletion(buffer, proposal);
 		}
 
-		if(addParen){
+		if (addParen) {
 			buffer.append(RPAREN);
 			// add semicolons only if there are parentheses
 			if (canAutomaticallyAppendSemicolon(proposal)) {
 				buffer.append(SEMICOLON);
 			}
 		}
-		if(proposal.getKind() == CompletionProposal.METHOD_DECLARATION){
+		if (proposal.getKind() == CompletionProposal.METHOD_DECLARATION) {
 			appendBody(buffer);
 		}
 	}
 
 	private boolean hasParameters(CompletionProposal proposal) throws IllegalArgumentException {
-		return hasArgumentList(proposal) &&
-				Signature.getParameterCount(proposal.getSignature()) > 0;
+		return hasArgumentList(proposal) && Signature.getParameterCount(proposal.getSignature()) > 0;
 	}
 
 	private void appendMethodNameReplacement(StringBuilder buffer, CompletionProposal proposal) {
@@ -455,9 +489,9 @@ public class CompletionProposalReplacementProvider {
 			proposal.setParameterNames(parameterNames);
 		}
 
-		int count= parameterNames.length;
+		int count = parameterNames.length;
 
-		if(client.isCompletionSnippetsSupported()){
+		if (client.isCompletionSnippetsSupported()) {
 			String[] choices = null;
 			boolean guessMethodArguments = JavaLanguageServerPlugin.getPreferencesManager() != null && JavaLanguageServerPlugin.getPreferencesManager().getPreferences().isGuessMethodArguments();
 			if (guessMethodArguments && (proposal.getKind() == CompletionProposal.METHOD_REF || proposal.getKind() == CompletionProposal.CONSTRUCTOR_INVOCATION || proposal.getKind() == CompletionProposal.METHOD_REF_WITH_CASTED_RECEIVER)) {
@@ -467,7 +501,7 @@ public class CompletionProposalReplacementProvider {
 					JavaLanguageServerPlugin.logException(e.getMessage(), e);
 				}
 			}
-			for (int i= 0; i < count; i++) {
+			for (int i = 0; i < count; i++) {
 				if (i != 0) {
 					buffer.append(COMMA);
 					buffer.append(SPACE);
@@ -484,7 +518,7 @@ public class CompletionProposalReplacementProvider {
 					argument = replace.toCharArray();
 				}
 				buffer.append("${");
-				buffer.append(Integer.toString(i+1));
+				buffer.append(Integer.toString(i + 1));
 				buffer.append(":");
 				buffer.append(argument);
 				buffer.append("}");
@@ -553,13 +587,13 @@ public class CompletionProposalReplacementProvider {
 			return new org.eclipse.lsp4j.TextEdit(range, buffer.toString());
 		}
 
-		IJavaProject project= compilationUnit.getJavaProject();
-		if (!shouldProposeGenerics(project)){
+		IJavaProject project = compilationUnit.getJavaProject();
+		if (!shouldProposeGenerics(project)) {
 			Range range = toReplacementRange(typeProposal);
 			return new org.eclipse.lsp4j.TextEdit(range, buffer.toString());
 		}
 
-		char[] completion= typeProposal.getCompletion();
+		char[] completion = typeProposal.getCompletion();
 		// don't add parameters for import-completions nor for proposals with an empty completion (e.g. inside the type argument list)
 		if (completion.length > 0 && (completion[completion.length - 1] == SEMICOLON || completion[completion.length - 1] == '.')) {
 			Range range = toReplacementRange(typeProposal);
@@ -571,17 +605,17 @@ public class CompletionProposalReplacementProvider {
 		 */
 		boolean onlyAppendArguments;
 		try {
-			onlyAppendArguments= typeProposal.getCompletion().length == 0 && offset > 0 && compilationUnit.getBuffer().getChar(offset - 1) == '<';
+			onlyAppendArguments = typeProposal.getCompletion().length == 0 && offset > 0 && compilationUnit.getBuffer().getChar(offset - 1) == '<';
 		} catch (JavaModelException e) {
-			onlyAppendArguments= false;
+			onlyAppendArguments = false;
 		}
 		if (onlyAppendArguments || shouldAppendArguments(typeProposal, trigger)) {
 			String[] typeArguments = computeTypeArgumentProposals(typeProposal);
-			if(typeArguments.length > 0){
-				if (canUseDiamond){
+			if (typeArguments.length > 0) {
+				if (canUseDiamond) {
 					buffer.append("<>"); //$NON-NLS-1$
 				} else {
-					appendParameterList(buffer,typeArguments, onlyAppendArguments);
+					appendParameterList(buffer, typeArguments, onlyAppendArguments);
 				}
 			}
 		}
@@ -592,9 +626,9 @@ public class CompletionProposalReplacementProvider {
 	private final boolean shouldProposeGenerics(IJavaProject project) {
 		String sourceVersion;
 		if (project != null) {
-			sourceVersion= project.getOption(JavaCore.COMPILER_SOURCE, true);
+			sourceVersion = project.getOption(JavaCore.COMPILER_SOURCE, true);
 		} else {
-			sourceVersion= JavaCore.getOption(JavaCore.COMPILER_SOURCE);
+			sourceVersion = JavaCore.getOption(JavaCore.COMPILER_SOURCE);
 		}
 
 		return !isVersionLessThan(sourceVersion, JavaCore.VERSION_1_5);
@@ -602,24 +636,23 @@ public class CompletionProposalReplacementProvider {
 
 	public static boolean isVersionLessThan(String version1, String version2) {
 		if (JavaCore.VERSION_CLDC_1_1.equals(version1)) {
-			version1= JavaCore.VERSION_1_1 + 'a';
+			version1 = JavaCore.VERSION_1_1 + 'a';
 		}
 		if (JavaCore.VERSION_CLDC_1_1.equals(version2)) {
-			version2= JavaCore.VERSION_1_1 + 'a';
+			version2 = JavaCore.VERSION_1_1 + 'a';
 		}
 		return version1.compareTo(version2) < 0;
 	}
 
 	private IJavaElement resolveJavaElement(IJavaProject project, CompletionProposal proposal) throws JavaModelException {
-		char[] signature= proposal.getSignature();
-		String typeName= SignatureUtil.stripSignatureToFQN(String.valueOf(signature));
+		char[] signature = proposal.getSignature();
+		String typeName = SignatureUtil.stripSignatureToFQN(String.valueOf(signature));
 		return project.findType(typeName);
 	}
 
 	private String[] computeTypeArgumentProposals(CompletionProposal proposal) {
 		try {
-			IType type = (IType) resolveJavaElement(
-					compilationUnit.getJavaProject(), proposal);
+			IType type = (IType) resolveJavaElement(compilationUnit.getJavaProject(), proposal);
 			if (type == null) {
 				return new String[0];
 			}
@@ -636,9 +669,9 @@ public class CompletionProposalReplacementProvider {
 				// in this case, the type arguments we propose need to be compatible
 				// with the corresponding type parameters to declared type
 
-				IType expectedType= (IType) expectedTypeBinding.getJavaElement();
+				IType expectedType = (IType) expectedTypeBinding.getJavaElement();
 
-				IType[] path= TypeProposalUtils.computeInheritancePath(type, expectedType);
+				IType[] path = TypeProposalUtils.computeInheritancePath(type, expectedType);
 				if (path == null) {
 					// proposed type does not inherit from expected type
 					// the user might be looking for an inner type of proposed type
@@ -646,19 +679,19 @@ public class CompletionProposalReplacementProvider {
 					return new String[0];
 				}
 
-				int[] indices= new int[parameters.length];
-				for (int paramIdx= 0; paramIdx < parameters.length; paramIdx++) {
-					indices[paramIdx]= TypeProposalUtils.mapTypeParameterIndex(path, path.length - 1, paramIdx);
+				int[] indices = new int[parameters.length];
+				for (int paramIdx = 0; paramIdx < parameters.length; paramIdx++) {
+					indices[paramIdx] = TypeProposalUtils.mapTypeParameterIndex(path, path.length - 1, paramIdx);
 				}
 
 				// for type arguments that are mapped through to the expected type's
 				// parameters, take the arguments of the expected type
-				ITypeBinding[] typeArguments= expectedTypeBinding.getTypeArguments();
-				for (int paramIdx= 0; paramIdx < parameters.length; paramIdx++) {
+				ITypeBinding[] typeArguments = expectedTypeBinding.getTypeArguments();
+				for (int paramIdx = 0; paramIdx < parameters.length; paramIdx++) {
 					if (indices[paramIdx] != -1) {
 						// type argument is mapped through
-						ITypeBinding binding= typeArguments[indices[paramIdx]];
-						arguments[paramIdx]= computeTypeProposal(binding, parameters[paramIdx]);
+						ITypeBinding binding = typeArguments[indices[paramIdx]];
+						arguments[paramIdx] = computeTypeProposal(binding, parameters[paramIdx]);
 					}
 				}
 			}
@@ -677,8 +710,8 @@ public class CompletionProposalReplacementProvider {
 	}
 
 	private String computeTypeProposal(ITypeParameter parameter) throws JavaModelException {
-		String[] bounds= parameter.getBounds();
-		String elementName= parameter.getElementName();
+		String[] bounds = parameter.getBounds();
+		String elementName = parameter.getElementName();
 		if (bounds.length == 1 && !"java.lang.Object".equals(bounds[0])) {
 			return Signature.getSimpleName(bounds[0]);
 		} else {
@@ -711,10 +744,10 @@ public class CompletionProposalReplacementProvider {
 			if (!onlyAppendArguments) {
 				buffer.append(LESS);
 			}
-			StringBuilder separator= new StringBuilder(3);
+			StringBuilder separator = new StringBuilder(3);
 			separator.append(COMMA);
 
-			for (int i= 0; i != typeArguments.length; i++) {
+			for (int i = 0; i != typeArguments.length; i++) {
 				if (i != 0) {
 					buffer.append(separator);
 				}
@@ -729,9 +762,7 @@ public class CompletionProposalReplacementProvider {
 		return buffer;
 	}
 
-
-	private boolean shouldAppendArguments(CompletionProposal proposal,
-			char trigger) {
+	private boolean shouldAppendArguments(CompletionProposal proposal, char trigger) {
 		/*
 		 * No argument list if there were any special triggers (for example a
 		 * period to qualify an inner type).
@@ -755,10 +786,10 @@ public class CompletionProposalReplacementProvider {
 		 */
 		try {
 			IDocument document = JsonRpcHelpers.toDocument(this.compilationUnit.getBuffer());
-			IRegion region= document.getLineInformationOfOffset(proposal.getReplaceEnd());
-			String line= document.get(region.getOffset(),region.getLength());
+			IRegion region = document.getLineInformationOfOffset(proposal.getReplaceEnd());
+			String line = document.get(region.getOffset(), region.getLength());
 
-			int index= proposal.getReplaceEnd() - region.getOffset();
+			int index = proposal.getReplaceEnd() - region.getOffset();
 			while (index != line.length() && Character.isUnicodeIdentifierPart(line.charAt(index))) {
 				++index;
 			}
@@ -767,7 +798,7 @@ public class CompletionProposalReplacementProvider {
 				return true;
 			}
 
-			char ch= line.charAt(index);
+			char ch = line.charAt(index);
 			return ch != '<';
 
 		} catch (BadLocationException | JavaModelException e) {
@@ -777,15 +808,15 @@ public class CompletionProposalReplacementProvider {
 	}
 
 	private StringBuilder appendImportProposal(StringBuilder buffer, CompletionProposal proposal, int coreKind) {
-		int proposalKind= proposal.getKind();
-		String qualifiedTypeName= null;
-		char[] qualifiedType= null;
+		int proposalKind = proposal.getKind();
+		String qualifiedTypeName = null;
+		char[] qualifiedType = null;
 		if (proposalKind == CompletionProposal.TYPE_IMPORT) {
-			qualifiedType= proposal.getSignature();
-			qualifiedTypeName= String.valueOf(Signature.toCharArray(qualifiedType));
+			qualifiedType = proposal.getSignature();
+			qualifiedTypeName = String.valueOf(Signature.toCharArray(qualifiedType));
 		} else if (proposalKind == CompletionProposal.METHOD_IMPORT || proposalKind == CompletionProposal.FIELD_IMPORT) {
-			qualifiedType= Signature.getTypeErasure(proposal.getDeclarationSignature());
-			qualifiedTypeName= String.valueOf(Signature.toCharArray(qualifiedType));
+			qualifiedType = Signature.getTypeErasure(proposal.getDeclarationSignature());
+			qualifiedTypeName = String.valueOf(Signature.toCharArray(qualifiedType));
 		} else {
 			/*
 			 * In 3.3 we only support the above import proposals, see
@@ -797,15 +828,15 @@ public class CompletionProposalReplacementProvider {
 		/* Add imports if the preference is on. */
 		if (importRewrite != null) {
 			if (proposalKind == CompletionProposal.TYPE_IMPORT) {
-				String simpleType= importRewrite.addImport(qualifiedTypeName, null);
+				String simpleType = importRewrite.addImport(qualifiedTypeName, null);
 				if (coreKind == CompletionProposal.METHOD_REF) {
 					buffer.append(simpleType);
 					buffer.append(COMMA);
 					return buffer;
 				}
 			} else {
-				String res= importRewrite.addStaticImport(qualifiedTypeName, String.valueOf(proposal.getName()), proposalKind == CompletionProposal.FIELD_IMPORT, null);
-				int dot= res.lastIndexOf('.');
+				String res = importRewrite.addStaticImport(qualifiedTypeName, String.valueOf(proposal.getName()), proposalKind == CompletionProposal.FIELD_IMPORT, null);
+				int dot = res.lastIndexOf('.');
 				if (dot != -1) {
 					buffer.append(importRewrite.addImport(res.substring(0, dot), null));
 					buffer.append('.');
@@ -823,7 +854,7 @@ public class CompletionProposalReplacementProvider {
 			if (proposal.getKind() == CompletionProposal.TYPE_IMPORT && coreKind == CompletionProposal.FIELD_REF) {
 				return buffer;
 			}
-			qualifiedTypeName= String.valueOf(Signature.getSignatureSimpleName(qualifiedType));
+			qualifiedTypeName = String.valueOf(Signature.getSignatureSimpleName(qualifiedType));
 		}
 		buffer.append(qualifiedTypeName);
 		buffer.append('.');
@@ -831,14 +862,14 @@ public class CompletionProposalReplacementProvider {
 	}
 
 	private ITypeBinding getExpectedTypeForGenericParameters() {
-		char[][] chKeys= context.getExpectedTypesKeys();
+		char[][] chKeys = context.getExpectedTypesKeys();
 		if (chKeys == null || chKeys.length == 0) {
 			return null;
 		}
 
-		String[] keys= new String[chKeys.length];
-		for (int i= 0; i < keys.length; i++) {
-			keys[i]= String.valueOf(chKeys[0]);
+		String[] keys = new String[chKeys.length];
+		for (int i = 0; i < keys.length; i++) {
+			keys[i] = String.valueOf(chKeys[0]);
 		}
 
 		final ASTParser parser = ASTParser.newParser(IASTSharedValues.SHARED_AST_LEVEL);
@@ -846,8 +877,8 @@ public class CompletionProposalReplacementProvider {
 		parser.setResolveBindings(true);
 		parser.setStatementsRecovery(true);
 
-		final Map<String, IBinding> bindings= new HashMap<>();
-		ASTRequestor requestor= new ASTRequestor() {
+		final Map<String, IBinding> bindings = new HashMap<>();
+		ASTRequestor requestor = new ASTRequestor() {
 			@Override
 			public void acceptBinding(String bindingKey, IBinding binding) {
 				bindings.put(bindingKey, binding);
@@ -875,16 +906,14 @@ public class CompletionProposalReplacementProvider {
 		 * types.
 		 */
 		// TODO fix
-		if (proposal.getKind() == CompletionProposal.TYPE_REF
-				&& context.isInJavadocText()) {
+		if (proposal.getKind() == CompletionProposal.TYPE_REF && context.isInJavadocText()) {
 			return SignatureUtil.getSimpleTypeName(proposal);
 		}
 
 		String qualifiedTypeName = SignatureUtil.getQualifiedTypeName(proposal);
 
 		// Type in package info must be fully qualified.
-		if (compilationUnit != null
-				&& TypeProposalUtils.isPackageInfo(compilationUnit)) {
+		if (compilationUnit != null && TypeProposalUtils.isPackageInfo(compilationUnit)) {
 			return qualifiedTypeName;
 		}
 
@@ -897,20 +926,18 @@ public class CompletionProposalReplacementProvider {
 		 * If the user types in the qualification, don't force import rewriting
 		 * on him - insert the qualified name.
 		 */
-		String prefix="";
-		try{
+		String prefix = "";
+		try {
 			IDocument document = JsonRpcHelpers.toDocument(this.compilationUnit.getBuffer());
-			IRegion region= document.getLineInformationOfOffset(proposal.getReplaceEnd());
-			prefix =  document.get(region.getOffset(), proposal.getReplaceEnd() -region.getOffset()).trim();
-		}catch(BadLocationException | JavaModelException e){
+			IRegion region = document.getLineInformationOfOffset(proposal.getReplaceEnd());
+			prefix = document.get(region.getOffset(), proposal.getReplaceEnd() - region.getOffset()).trim();
+		} catch (BadLocationException | JavaModelException e) {
 
 		}
 		int dotIndex = prefix.lastIndexOf('.');
 		// match up to the last dot in order to make higher level matching still
 		// work (camel case...)
-		if (dotIndex != -1
-				&& qualifiedTypeName.toLowerCase().startsWith(
-						prefix.substring(0, dotIndex + 1).toLowerCase())) {
+		if (dotIndex != -1 && qualifiedTypeName.toLowerCase().startsWith(prefix.substring(0, dotIndex + 1).toLowerCase())) {
 			return qualifiedTypeName;
 		}
 
@@ -919,8 +946,7 @@ public class CompletionProposalReplacementProvider {
 		 * qualified by its parent) - use the replacement directly.
 		 */
 		if (replacement.indexOf('.') == -1) {
-			if (isInJavadoc())
-			{
+			if (isInJavadoc()) {
 				return SignatureUtil.getSimpleTypeName(proposal); // don't use
 			}
 			// the
@@ -932,22 +958,19 @@ public class CompletionProposalReplacementProvider {
 			return replacement;
 		}
 
+		// TODO(eskibear): no need
 		/* Add imports if the preference is on. */
-		if (importRewrite != null) {
-			return importRewrite.addImport(qualifiedTypeName, null);
-		}
+		// if (importRewrite != null) {
+		// 	return importRewrite.addImport(qualifiedTypeName, null);
+		// }
 
 		// fall back for the case we don't have an import rewrite (see
 		// allowAddingImports)
 
 		/* No imports for implicit imports. */
-		if (compilationUnit != null
-				&& TypeProposalUtils.isImplicitImport(
-						Signature.getQualifier(qualifiedTypeName),
-						compilationUnit)) {
+		if (compilationUnit != null && TypeProposalUtils.isImplicitImport(Signature.getQualifier(qualifiedTypeName), compilationUnit)) {
 			return Signature.getSimpleName(qualifiedTypeName);
 		}
-
 
 		/* Default: use the fully qualified type name. */
 		return qualifiedTypeName;
