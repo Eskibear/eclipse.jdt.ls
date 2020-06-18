@@ -13,7 +13,6 @@
 package org.eclipse.jdt.ls.core.internal.contentassist;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +43,6 @@ import org.eclipse.jdt.ls.core.internal.JavaLanguageServerPlugin;
 import org.eclipse.jdt.ls.core.internal.handlers.CompletionResolveHandler;
 import org.eclipse.jdt.ls.core.internal.handlers.CompletionResponse;
 import org.eclipse.jdt.ls.core.internal.handlers.CompletionResponses;
-import org.eclipse.jdt.ls.core.internal.preferences.PreferenceManager;
 import org.eclipse.jface.text.Region;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
@@ -59,55 +57,6 @@ public final class CompletionProposalRequestor extends CompletionRequestor {
 	private CompletionResponse response;
 	private boolean fIsTestCodeExcluded;
 	private CompletionContext context;
-	private boolean isComplete = true;
-	private PreferenceManager preferenceManager;
-	private CompletionProposalReplacementProvider proposalProvider;
-
-	static class ProposalComparator implements Comparator<CompletionProposal> {
-
-		private Map<CompletionProposal, char[]> completionCache;
-
-		ProposalComparator(int cacheSize) {
-			completionCache = new HashMap<>(cacheSize + 1, 1f);//avoid resizing the cache
-		}
-
-		@Override
-		public int compare(CompletionProposal p1, CompletionProposal p2) {
-			int res = p2.getRelevance() - p1.getRelevance();
-			if (res == 0) {
-				res = p1.getKind() - p2.getKind();
-			}
-			if (res == 0) {
-				char[] completion1 = getCompletion(p1);
-				char[] completion2 = getCompletion(p2);
-
-				int p1Length = completion1.length;
-				int p2Length = completion2.length;
-				for (int i = 0; i < p1Length; i++) {
-					if (i >= p2Length) {
-						return -1;
-					}
-					res = Character.compare(completion1[i], completion2[i]);
-					if (res != 0) {
-						return res;
-					}
-				}
-				res = p2Length - p1Length;
-			}
-			return res;
-		}
-
-		private char[] getCompletion(CompletionProposal cp) {
-			// Implementation of CompletionProposal#getCompletion() can be non-trivial,
-			// so we cache the results to speed things up
-			return completionCache.computeIfAbsent(cp, p -> p.getCompletion());
-		}
-
-	};
-
-	public boolean isComplete() {
-		return isComplete;
-	}
 
 	// Update SUPPORTED_KINDS when mapKind changes
 	// @formatter:off
@@ -126,18 +75,8 @@ public final class CompletionProposalRequestor extends CompletionRequestor {
 																				CompletionItemKind.Text);
 	// @formatter:on
 
-	/**
-	 * @deprecated use
-	 *             {@link CompletionProposalRequestor#CompletionProposalRequestor(ICompilationUnit, int, PreferenceManager)}
-	 */
-	@Deprecated
 	public CompletionProposalRequestor(ICompilationUnit aUnit, int offset) {
-		this(aUnit, offset, JavaLanguageServerPlugin.getPreferencesManager());
-	}
-
-	public CompletionProposalRequestor(ICompilationUnit aUnit, int offset, PreferenceManager preferenceManager) {
 		this.unit = aUnit;
-		this.preferenceManager = preferenceManager;
 		response = new CompletionResponse();
 		response.setOffset(offset);
 		fIsTestCodeExcluded = !isTestSource(unit.getJavaProject(), unit);
@@ -185,29 +124,11 @@ public final class CompletionProposalRequestor extends CompletionRequestor {
 	}
 
 	public List<CompletionItem> getCompletionItems() {
-		//Sort the results by relevance 1st
-		proposals.sort(new ProposalComparator(proposals.size()));
-		List<CompletionItem> completionItems = new ArrayList<>(proposals.size());
-		int maxCompletions = preferenceManager.getPreferences().getMaxCompletionResults();
-		int limit = Math.min(proposals.size(), maxCompletions);
-		if (proposals.size() > maxCompletions) {
-			//we keep receiving completions past our capacity so that makes the whole result incomplete
-			isComplete = false;
-			response.setProposals(proposals.subList(0, limit));
-		} else {
-			response.setProposals(proposals);
-		}
+		response.setProposals(proposals);
 		CompletionResponses.store(response);
-
-		//Let's compute replacement texts for the most relevant results only
-		for (int i = 0; i < limit; i++) {
-			CompletionProposal proposal = proposals.get(i);
-			try {
-				CompletionItem item = toCompletionItem(proposal, i);
-				completionItems.add(item);
-			} catch (Exception e) {
-				JavaLanguageServerPlugin.logException(e.getMessage(), e);
-			}
+		List<CompletionItem> completionItems = new ArrayList<>(proposals.size());
+		for (int i = 0; i < proposals.size(); i++) {
+			completionItems.add(toCompletionItem(proposals.get(i), i));
 		}
 		return completionItems;
 	}
@@ -265,7 +186,8 @@ public final class CompletionProposalRequestor extends CompletionRequestor {
 				JavaLanguageServerPlugin.log(e);
 			}
 		}
-		proposalProvider.updateReplacement(proposal, $, '\0');
+
+		// TODO: after 'lazy' resolve textEdit, below issue should be gone automatically, it should be ok to remove the workaround
 		// Make sure `filterText` matches `textEdit`
 		// See https://github.com/eclipse/eclipse.jdt.ls/issues/1348
 		if (proposal.getKind() == CompletionProposal.TYPE_REF && $.getTextEdit() != null && $.getTextEdit().getRange() != null && $.getTextEdit().getNewText() != null) {
@@ -280,7 +202,6 @@ public final class CompletionProposalRequestor extends CompletionRequestor {
 		this.context = context;
 		response.setContext(context);
 		this.descriptionProvider = new CompletionProposalDescriptionProvider(context);
-		this.proposalProvider = new CompletionProposalReplacementProvider(unit, context, response.getOffset(), preferenceManager.getPreferences(), preferenceManager.getClientPreferences());
 	}
 
 

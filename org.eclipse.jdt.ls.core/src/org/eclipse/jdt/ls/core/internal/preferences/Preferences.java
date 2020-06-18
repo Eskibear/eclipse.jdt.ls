@@ -228,13 +228,6 @@ public class Preferences {
 	public static final List<String> JAVA_COMPLETION_FAVORITE_MEMBERS_DEFAULT;
 
 	/**
-	 * Preference key for maximum number of completion results to be returned.
-	 * Defaults to 50.
-	 */
-	public static final String JAVA_COMPLETION_MAX_RESULTS_KEY = "java.completion.maxResults";
-	public static final int JAVA_COMPLETION_MAX_RESULTS_DEFAULT = 50;
-
-	/**
 	 * A named preference that controls if the Java code assist only inserts
 	 * completions. When set to true, code completion overwrites the current text.
 	 * When set to false, code is simply added instead.
@@ -432,8 +425,8 @@ public class Preferences {
 	private String formatterProfileName;
 	private Collection<IPath> rootPaths;
 	private Collection<IPath> triggerFiles;
+
 	private int parallelBuildsCount;
-	private int maxCompletionResults;
 	private int importOnDemandThreshold;
 	private int staticImportOnDemandThreshold;
 	private Set<RuntimeEnvironment> runtimes = new HashSet<>();
@@ -602,7 +595,6 @@ public class Preferences {
 		importOrder = JAVA_IMPORT_ORDER_DEFAULT;
 		filteredTypes = JAVA_COMPLETION_FILTERED_TYPES_DEFAULT;
 		parallelBuildsCount = PreferenceInitializer.PREF_MAX_CONCURRENT_BUILDS_DEFAULT;
-		maxCompletionResults = JAVA_COMPLETION_MAX_RESULTS_DEFAULT;
 		importOnDemandThreshold = IMPORTS_ONDEMANDTHRESHOLD_DEFAULT;
 		staticImportOnDemandThreshold = IMPORTS_STATIC_ONDEMANDTHRESHOLD_DEFAULT;
 		referencedLibraries = JAVA_PROJECT_REFERENCED_LIBRARIES_DEFAULT;
@@ -775,9 +767,6 @@ public class Preferences {
 		int maxConcurrentBuilds = getInt(configuration, JAVA_MAX_CONCURRENT_BUILDS, PreferenceInitializer.PREF_MAX_CONCURRENT_BUILDS_DEFAULT);
 		maxConcurrentBuilds = maxConcurrentBuilds >= 1 ? maxConcurrentBuilds : 1;
 		prefs.setMaxBuildCount(maxConcurrentBuilds);
-
-		int maxCompletions = getInt(configuration, JAVA_COMPLETION_MAX_RESULTS_KEY, JAVA_COMPLETION_MAX_RESULTS_DEFAULT);
-		prefs.setMaxCompletionResults(maxCompletions);
 
 		int onDemandThreshold = getInt(configuration, IMPORTS_ONDEMANDTHRESHOLD, IMPORTS_ONDEMANDTHRESHOLD_DEFAULT);
 		prefs.setImportOnDemandThreshold(onDemandThreshold);
@@ -1308,30 +1297,8 @@ public class Preferences {
 		return javaFormatOnTypeEnabled;
 	}
 
-	public Preferences setJavaFormatOnTypeEnabled(boolean javaFormatOnTypeEnabled) {
+	public void setJavaFormatOnTypeEnabled(boolean javaFormatOnTypeEnabled) {
 		this.javaFormatOnTypeEnabled = javaFormatOnTypeEnabled;
-		return this;
-	}
-
-	public int getMaxCompletionResults() {
-		return maxCompletionResults;
-	}
-
-	/**
-	 * Sets the maximum number of completion results (excluding snippets and Javadoc
-	 * proposals). If maxCompletions is set to 0 or lower, then the completion limit
-	 * is considered disabled, which could certainly severly impact performance in a
-	 * negative way.
-	 *
-	 * @param maxCompletions
-	 */
-	public Preferences setMaxCompletionResults(int maxCompletions) {
-		if (maxCompletions < 1) {
-			this.maxCompletionResults = Integer.MAX_VALUE;
-		} else {
-			this.maxCompletionResults = maxCompletions;
-		}
-		return this;
 	}
 
 	public ReferencedLibraries getReferencedLibraries() {
