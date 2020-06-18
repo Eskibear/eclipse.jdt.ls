@@ -103,6 +103,7 @@ public class CompletionResolveHandler {
 		CompletionProposalReplacementProvider proposalProvider = new CompletionProposalReplacementProvider(unit,
 				completionResponse.getContext(),
 				completionResponse.getOffset(),
+				this.manager.getPreferences(),
 				this.manager.getClientPreferences());
 		proposalProvider.updateReplacement(completionResponse.getProposals().get(proposalId), param, '\0');
 		if (monitor.isCanceled()) {
