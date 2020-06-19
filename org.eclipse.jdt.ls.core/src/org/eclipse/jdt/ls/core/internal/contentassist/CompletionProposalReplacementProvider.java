@@ -958,11 +958,10 @@ public class CompletionProposalReplacementProvider {
 			return replacement;
 		}
 
-		// TODO(eskibear): no need
 		/* Add imports if the preference is on. */
-		// if (importRewrite != null) {
-		// 	return importRewrite.addImport(qualifiedTypeName, null);
-		// }
+		if (importRewrite != null) {
+			return importRewrite.addImport(qualifiedTypeName, null);
+		}
 
 		// fall back for the case we don't have an import rewrite (see
 		// allowAddingImports)
