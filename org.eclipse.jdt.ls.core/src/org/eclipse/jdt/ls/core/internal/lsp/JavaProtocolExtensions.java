@@ -35,6 +35,10 @@ import org.eclipse.jdt.ls.core.internal.handlers.MoveHandler.MoveDestinationsRes
 import org.eclipse.jdt.ls.core.internal.handlers.MoveHandler.MoveParams;
 import org.eclipse.jdt.ls.core.internal.handlers.OverrideMethodsHandler.AddOverridableMethodParams;
 import org.eclipse.jdt.ls.core.internal.handlers.OverrideMethodsHandler.OverridableMethodsResponse;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyItem;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyPrepareParams;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchySubtypesParams;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchySupertypesParams;
 import org.eclipse.jdt.ls.core.internal.handlers.WorkspaceSymbolHandler.SearchSymbolParams;
 import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.Location;
@@ -124,4 +128,14 @@ public interface JavaProtocolExtensions {
 
 	@JsonRequest
 	CompletableFuture<List<? extends Location>> findLinks(FindLinksParams params);
+
+	// Proposed in LSP 3.17, to remove when it is ready
+	@JsonRequest
+	CompletableFuture<List<TypeHierarchyItem>> prepareTypeHierarchy(TypeHierarchyPrepareParams params);
+	
+	@JsonRequest
+	CompletableFuture<List<TypeHierarchyItem>> supertypes(TypeHierarchySupertypesParams params);
+
+	@JsonRequest
+	CompletableFuture<List<TypeHierarchyItem>> subypes(TypeHierarchySubtypesParams params);
 }

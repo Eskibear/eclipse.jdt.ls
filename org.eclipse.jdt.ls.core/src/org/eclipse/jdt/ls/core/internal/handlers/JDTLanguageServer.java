@@ -66,6 +66,10 @@ import org.eclipse.jdt.ls.core.internal.handlers.MoveHandler.MoveDestinationsRes
 import org.eclipse.jdt.ls.core.internal.handlers.MoveHandler.MoveParams;
 import org.eclipse.jdt.ls.core.internal.handlers.OverrideMethodsHandler.AddOverridableMethodParams;
 import org.eclipse.jdt.ls.core.internal.handlers.OverrideMethodsHandler.OverridableMethodsResponse;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyItem;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyPrepareParams;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchySubtypesParams;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchySupertypesParams;
 import org.eclipse.jdt.ls.core.internal.handlers.WorkspaceSymbolHandler.SearchSymbolParams;
 import org.eclipse.jdt.ls.core.internal.lsp.JavaProtocolExtensions;
 import org.eclipse.jdt.ls.core.internal.managers.ContentProviderManager;
@@ -1009,6 +1013,24 @@ public class JDTLanguageServer extends BaseJDTLanguageServer implements Language
 
 	private void waitForLifecycleJobs(IProgressMonitor monitor) {
 		JobHelpers.waitForJobs(DocumentLifeCycleHandler.DOCUMENT_LIFE_CYCLE_JOBS, monitor);
+	}
+
+	@Override
+	public CompletableFuture<List<TypeHierarchyItem>> prepareTypeHierarchy(TypeHierarchyPrepareParams params) {
+		logInfo(">> java/prepareTypeHierarchy");
+		return computeAsyncWithClientProgress((monitor) -> new TypeHierarchyHandler().prepareTypeHierarchy(params, monitor));
+	}
+
+	@Override
+	public CompletableFuture<List<TypeHierarchyItem>> supertypes(TypeHierarchySupertypesParams params) {
+		logInfo(">> java/supertypes");
+		return computeAsyncWithClientProgress((monitor) -> new TypeHierarchyHandler().supertypes(params, monitor));
+	}
+
+	@Override
+	public CompletableFuture<List<TypeHierarchyItem>> subypes(TypeHierarchySubtypesParams params) {
+		logInfo(">> java/subypes");
+		return computeAsyncWithClientProgress((monitor) -> new TypeHierarchyHandler().subypes(params, monitor));
 	}
 
 }
