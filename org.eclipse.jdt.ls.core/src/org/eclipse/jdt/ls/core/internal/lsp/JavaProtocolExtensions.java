@@ -37,6 +37,7 @@ import org.eclipse.jdt.ls.core.internal.handlers.OverrideMethodsHandler.AddOverr
 import org.eclipse.jdt.ls.core.internal.handlers.OverrideMethodsHandler.OverridableMethodsResponse;
 import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyItem;
 import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyPrepareParams;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyRootTypeParams;
 import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchySubtypesParams;
 import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchySupertypesParams;
 import org.eclipse.jdt.ls.core.internal.handlers.WorkspaceSymbolHandler.SearchSymbolParams;
@@ -137,5 +138,8 @@ public interface JavaProtocolExtensions {
 	CompletableFuture<List<TypeHierarchyItem>> supertypes(TypeHierarchySupertypesParams params);
 
 	@JsonRequest
-	CompletableFuture<List<TypeHierarchyItem>> subypes(TypeHierarchySubtypesParams params);
+	CompletableFuture<List<TypeHierarchyItem>> subtypes(TypeHierarchySubtypesParams params);
+
+	@JsonRequest
+	CompletableFuture<TypeHierarchyItem> rootType(TypeHierarchyRootTypeParams params);
 }

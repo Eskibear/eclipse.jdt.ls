@@ -68,6 +68,7 @@ import org.eclipse.jdt.ls.core.internal.handlers.OverrideMethodsHandler.AddOverr
 import org.eclipse.jdt.ls.core.internal.handlers.OverrideMethodsHandler.OverridableMethodsResponse;
 import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyItem;
 import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyPrepareParams;
+import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchyRootTypeParams;
 import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchySubtypesParams;
 import org.eclipse.jdt.ls.core.internal.handlers.TypeHierarchyHandler.TypeHierarchySupertypesParams;
 import org.eclipse.jdt.ls.core.internal.handlers.WorkspaceSymbolHandler.SearchSymbolParams;
@@ -1028,9 +1029,16 @@ public class JDTLanguageServer extends BaseJDTLanguageServer implements Language
 	}
 
 	@Override
-	public CompletableFuture<List<TypeHierarchyItem>> subypes(TypeHierarchySubtypesParams params) {
-		logInfo(">> java/subypes");
-		return computeAsyncWithClientProgress((monitor) -> new TypeHierarchyHandler().subypes(params, monitor));
+	public CompletableFuture<List<TypeHierarchyItem>> subtypes(TypeHierarchySubtypesParams params) {
+		logInfo(">> java/subtypes");
+		return computeAsyncWithClientProgress((monitor) -> new TypeHierarchyHandler().subtypes(params, monitor));
+	}
+
+	// fake
+	@Override
+	public CompletableFuture<TypeHierarchyItem> rootType(TypeHierarchyRootTypeParams params) {
+		logInfo(">> java/subtypes");
+		return computeAsyncWithClientProgress((monitor) -> new TypeHierarchyHandler().rootType(params, monitor));
 	}
 
 }
