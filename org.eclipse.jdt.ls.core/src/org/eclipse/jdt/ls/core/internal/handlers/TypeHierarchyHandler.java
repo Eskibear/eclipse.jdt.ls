@@ -46,11 +46,11 @@ public class TypeHierarchyHandler {
         ITypeHierarchy typeHierarchy;
         try {
             type = getType(uri, position, monitor);
-            typeHierarchy = type.newTypeHierarchy(type.getJavaProject(), DefaultWorkingCopyOwner.PRIMARY, monitor);
-            response.setHierarchy(typeHierarchy);
-            TypeHierarchyResponses.store(response);
+            // typeHierarchy = type.newTypeHierarchy(type.getJavaProject(), DefaultWorkingCopyOwner.PRIMARY, monitor);
+            // response.setHierarchy(typeHierarchy);
+            // TypeHierarchyResponses.store(response);
             TypeHierarchyItem item = toTypeHierarchyItem(type);
-            ((ItemData) item.getData()).setHierarchyId(response.getId());
+            // ((ItemData) item.getData()).setHierarchyId(response.getId());
             return List.of(item);
         } catch (JavaModelException e) {
             return null;
@@ -81,7 +81,8 @@ public class TypeHierarchyHandler {
                 }   
             } 
             if (typeHierarchy == null) {
-                typeHierarchy = type.newSupertypeHierarchy(DefaultWorkingCopyOwner.PRIMARY, monitor);
+                // typeHierarchy = type.newSupertypeHierarchy(DefaultWorkingCopyOwner.PRIMARY, monitor);
+                typeHierarchy = type.newTypeHierarchy(type.getJavaProject(), DefaultWorkingCopyOwner.PRIMARY, monitor);
                 TypeHierarchyResponse response = new TypeHierarchyResponse();
                 response.setHierarchy(typeHierarchy);
                 TypeHierarchyResponses.store(response);
@@ -165,7 +166,7 @@ public class TypeHierarchyHandler {
                 }   
             }
             if (typeHierarchy == null) {
-                typeHierarchy = type.newSupertypeHierarchy(DefaultWorkingCopyOwner.PRIMARY, monitor);
+                typeHierarchy = type.newTypeHierarchy(type.getJavaProject(), DefaultWorkingCopyOwner.PRIMARY, monitor);
                 TypeHierarchyResponse response = new TypeHierarchyResponse();
                 response.setHierarchy(typeHierarchy);
                 TypeHierarchyResponses.store(response);
